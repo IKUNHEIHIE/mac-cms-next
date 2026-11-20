@@ -13,3 +13,4 @@ prisma/maccms.db
 _probe*.json
 public/uploads/*
 !public/uploads/.gitkeep
+*.tsbuildinfo
