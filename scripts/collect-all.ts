@@ -1,5 +1,5 @@
 import { prisma } from "../src/lib/db";
-import { mapLzVod, importTypes, LZ_API } from "../src/lib/collect";
+import { mapLzVod, importTypes, LZ_API, getCollectBindings } from "../src/lib/collect";
 
 const STATE_KEY = "collect_all_state";
 const MIN_INTERVAL = 1200;
@@ -19,6 +19,7 @@ type State = {
   startedAt: number;
   updatedAt: number;
   lastError?: string;
+  pid?: number;
   rate?: { interval: number; last429: number };
 };
 
@@ -119,11 +120,11 @@ async function fetchPage(page: number): Promise<{ list: LzVod[]; pagecount: numb
   throw new Error(`page ${page}: ${lastErr}`);
 }
 
-async function insertPage(list: LzVod[], parent: Record<number, number>) {
+async function insertPage(list: LzVod[], parent: Record<number, number>, bindings: Record<number, number>) {
   const rows = list
     .map((v) => {
       try {
-        return mapLzVod(v, parent);
+        return mapLzVod(v, parent, { bindings });
       } catch {
         return null;
       }
@@ -152,6 +153,7 @@ async function main() {
   const types = await prisma.type.findMany({ select: { typeId: true, typePid: true } });
   const parent: Record<number, number> = {};
   for (const t of types) parent[t.typeId] = t.typePid;
+  const bindings = await getCollectBindings(LZ_API);
 
   const before = await prisma.vod.count();
   const prev = await loadState();
@@ -184,11 +186,13 @@ async function main() {
     };
     log(`资源站共 ${state.pagecount} 页 / ${state.total} 条，现有影片 ${before} 条`);
   }
+  state.pid = process.pid;
   await saveState(state);
 
   const onStop = async () => {
     stopping = true;
     state.status = "paused";
+    state.pid = 0;
     await saveState(state);
     log(`收到停止信号，已保存断点：第 ${state.nextPage} 页`);
     await prisma.$disconnect();
@@ -202,7 +206,7 @@ async function main() {
   while (page <= state.pagecount && !stopping) {
     try {
       const data = await fetchPage(page);
-      const ins = await insertPage(data.list, parent);
+      const ins = await insertPage(data.list, parent, bindings);
       state.imported += ins.created;
       state.skipped += ins.dup;
       state.pagesDone++;
@@ -233,7 +237,7 @@ async function main() {
       if (stopping) break;
       try {
         const data = await fetchPage(p);
-        const ins = await insertPage(data.list, parent);
+        const ins = await insertPage(data.list, parent, bindings);
         state.imported += ins.created;
         state.skipped += ins.dup;
         state.pagesDone++;
@@ -246,6 +250,7 @@ async function main() {
 
   state.status = state.failedPages.length ? "done-with-errors" : "done";
   state.nextPage = state.pagecount + 1;
+  state.pid = 0;
   await saveState(state);
   const after = await prisma.vod.count();
   const elapsed = Math.floor((Date.now() / 1000 - startedAt) / 60);
@@ -262,6 +267,7 @@ main().catch(async (e) => {
     const st = await loadState();
     if (st) {
       st.status = "paused";
+      st.pid = 0;
       st.lastError = e instanceof Error ? e.message : String(e);
       await saveState(st);
     }

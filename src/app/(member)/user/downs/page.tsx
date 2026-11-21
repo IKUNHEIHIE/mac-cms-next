@@ -21,7 +21,7 @@ export default async function DownsPage() {
           const v = vods.find((x) => x.vodId === l.ulogRid);
           if (!v) return null;
           return (
-            <li key={l.ulogId} style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: "1px dashed #f0f0f0" }}>
+            <li key={l.ulogId} className="mc_list_row" style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: "1px dashed #f0f0f0" }}>
               <span style={{ width: 96, height: 56, flex: "none", borderRadius: 4, backgroundImage: `url(${poster(v.vodPic)})`, backgroundSize: "cover" }} />
               <div style={{ flex: 1 }}>
                 <Link href={`/vod/down/${v.vodId}`} style={{ fontSize: 15, color: "#333" }}>{v.vodName}</Link>

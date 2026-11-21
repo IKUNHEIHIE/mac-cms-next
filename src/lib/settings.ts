@@ -72,7 +72,7 @@ export const defaultSettings: Settings = {
     hotTitle: "热播推荐",
     hotNum: 12,
     homeNum: 12,
-    navIds: [1, 2, 3, 4, 35],
+    navIds: [1, 2, 3, 4, 36],
     menuIds: [1, 2, 3, 4, 46],
     categoryHomeIds: [1, 2, 3, 4],
     zbTypeId: 0,

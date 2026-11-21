@@ -1,3 +1,4 @@
+import { safeHtml } from "@/lib/sanitize";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import VodCard from "@/components/site/VodCard";
@@ -50,7 +51,7 @@ export default async function TopicDetailPage({ params }: { params: Promise<{ id
           </ul>
           {ordered.length === 0 ? <div className="show_no">暂无影片</div> : null}
           {topic.topicContent ? (
-            <div style={{ padding: "0.3rem 0", color: "#666", lineHeight: 1.9 }} dangerouslySetInnerHTML={{ __html: topic.topicContent }} />
+            <div style={{ padding: "0.3rem 0", color: "#666", lineHeight: 1.9 }} dangerouslySetInnerHTML={{ __html: safeHtml(topic.topicContent) }} />
           ) : null}
         </div>
       </div>

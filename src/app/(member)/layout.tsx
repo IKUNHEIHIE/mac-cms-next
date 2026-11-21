@@ -1,7 +1,7 @@
 import "../(site)/site.css";
-import "./member.css";
 import Link from "next/link";
 import { isRequestBlocked } from "@/lib/extraSettings";
+import ThemeRem from "@/components/site/ThemeRem";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,9 @@ export default async function MemberLayout({ children }: { children: React.React
   }
   return (
     <>
+      <ThemeRem />
       <link rel="stylesheet" href="/theme/conch/asset/css/member/member.conch.css" />
+      <link rel="stylesheet" href="/theme/conch/member.css" />
       <div className="mc_member_head">
         <div className="mc_member_head_inner">
           <Link href="/" className="mc_member_logo">
@@ -22,7 +24,6 @@ export default async function MemberLayout({ children }: { children: React.React
           <nav>
             <Link href="/">首页</Link>
             <Link href="/user">会员中心</Link>
-            <Link href="/user/pay">充值</Link>
           </nav>
         </div>
       </div>

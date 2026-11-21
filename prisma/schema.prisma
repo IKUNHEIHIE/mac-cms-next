@@ -195,36 +195,6 @@ model Manga {
   @@map("mac_manga")
 }
 
-model Card {
-  cardId         Int    @id @default(autoincrement()) @map("card_id")
-  cardNo         String @default("") @db.VarChar(255) @map("card_no")
-  cardPwd        String @default("") @db.VarChar(255) @map("card_pwd")
-  cardMoney      Int    @default(0) @map("card_money")
-  cardPoints     Int    @default(0) @map("card_points")
-  cardUseStatus  Int    @default(0) @map("card_use_status")
-  cardSaleStatus Int    @default(0) @map("card_sale_status")
-  userId         Int    @default(0) @map("user_id")
-  cardAddTime    Int    @default(0) @map("card_add_time")
-  cardUseTime    Int    @default(0) @map("card_use_time")
-
-  @@map("mac_card")
-}
-
-model Cash {
-  cashId         Int    @id @default(autoincrement()) @map("cash_id")
-  userId         Int    @default(0) @map("user_id")
-  cashStatus     Int    @default(0) @map("cash_status")
-  cashPoints     Int    @default(0) @map("cash_points")
-  cashMoney      Float  @default(0) @map("cash_money")
-  cashBankName   String @default("") @db.VarChar(255) @map("cash_bank_name")
-  cashBankNo     String @default("") @db.VarChar(255) @map("cash_bank_no")
-  cashPayeeName  String @default("") @db.VarChar(255) @map("cash_payee_name")
-  cashTime       Int    @default(0) @map("cash_time")
-  cashTimeAudit  Int    @default(0) @map("cash_time_audit")
-
-  @@map("mac_cash")
-}
-
 model CjContent {
   id     Int    @id @default(autoincrement())
   nodeid Int    @default(0)
@@ -292,6 +262,11 @@ model Collect {
   collectFilterYear  String @default("") @db.VarChar(255) @map("collect_filter_year")
   collectOpt         Int    @default(0) @map("collect_opt")
   collectSyncPicOpt  Int    @default(0) @map("collect_sync_pic_opt")
+  collectPlayerName  String @default("") @db.VarChar(60) @map("collect_player_name")
+  collectPlayerFrom  String @default("") @db.VarChar(255) @map("collect_player_from")
+  collectPlayerFile  String @default("") @db.VarChar(1024) @map("collect_player_file")
+  collectPlayerType  String @default("") @db.VarChar(10) @map("collect_player_type")
+  collectPlayerStatus Int   @default(0) @map("collect_player_status")
 
   @@map("mac_collect")
 }
@@ -337,11 +312,6 @@ model Group {
   groupStatus     Int    @default(1) @map("group_status")
   groupType       String? @db.MediumText @map("group_type")
   groupPopedom    String? @db.MediumText @map("group_popedom")
-  groupPointsDay  Int    @default(0) @map("group_points_day")
-  groupPointsWeek Int    @default(0) @map("group_points_week")
-  groupPointsMonth Int   @default(0) @map("group_points_month")
-  groupPointsYear Int    @default(0) @map("group_points_year")
-  groupPointsFree Int    @default(0) @map("group_points_free")
 
   @@map("mac_group")
 }
@@ -370,35 +340,6 @@ model Msg {
   msgTime    Int    @default(0) @map("msg_time")
 
   @@map("mac_msg")
-}
-
-model Order {
-  orderId      Int    @id @default(autoincrement()) @map("order_id")
-  userId       Int    @default(0) @map("user_id")
-  orderStatus  Int    @default(0) @map("order_status")
-  orderCode    String @default("") @db.VarChar(255) @map("order_code")
-  orderPrice   Float  @default(0) @map("order_price")
-  orderTime    Int    @default(0) @map("order_time")
-  orderPoints  Int    @default(0) @map("order_points")
-  orderPayType String @default("") @db.VarChar(255) @map("order_pay_type")
-  orderPayTime Int    @default(0) @map("order_pay_time")
-  orderRemarks String @default("") @db.VarChar(255) @map("order_remarks")
-
-  @@index([userId])
-  @@map("mac_order")
-}
-
-model Plog {
-  plogId      Int    @id @default(autoincrement()) @map("plog_id")
-  userId      Int    @default(0) @map("user_id")
-  userId1     Int    @default(0) @map("user_id_1")
-  plogType    Int    @default(1) @map("plog_type")
-  plogPoints  Int    @default(0) @map("plog_points")
-  plogTime    Int    @default(0) @map("plog_time")
-  plogRemarks String @default("") @db.VarChar(255) @map("plog_remarks")
-
-  @@index([userId])
-  @@map("mac_plog")
 }
 
 model Role {
@@ -485,6 +426,7 @@ model Type {
   typeMid       Int    @default(1) @map("type_mid")
   typePid       Int    @default(0) @map("type_pid")
   typeStatus    Int    @default(1) @map("type_status")
+  typeSystem    Int    @default(0) @map("type_system")
   typeTpl       String @default("") @db.VarChar(255) @map("type_tpl")
   typeTplList   String @default("") @db.VarChar(255) @map("type_tpl_list")
   typeTplDetail String @default("") @db.VarChar(255) @map("type_tpl_detail")
@@ -533,8 +475,6 @@ model User {
   userOpenidWeixin  String @default("") @db.VarChar(255) @map("user_openid_weixin")
   userQuestion      String @default("") @db.VarChar(255) @map("user_question")
   userAnswer        String @default("") @db.VarChar(255) @map("user_answer")
-  userPoints        Int    @default(0) @map("user_points")
-  userPointsFroze   Int    @default(0) @map("user_points_froze")
   userRegTime       Int    @default(0) @map("user_reg_time")
   userRegIp         Int    @default(0) @map("user_reg_ip")
   userLoginTime     Int    @default(0) @map("user_login_time")
@@ -545,9 +485,6 @@ model User {
   userExtend        Int    @default(0) @map("user_extend")
   userRandom        String @default("") @db.VarChar(255) @map("user_random")
   userEndTime       Int    @default(0) @map("user_end_time")
-  userPid           Int    @default(0) @map("user_pid")
-  userPid2          Int    @default(0) @map("user_pid_2")
-  userPid3          Int    @default(0) @map("user_pid_3")
 
   @@index([userName])
   @@map("mac_user")

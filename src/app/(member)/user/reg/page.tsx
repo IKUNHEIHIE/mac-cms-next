@@ -5,14 +5,11 @@ import { getExtra } from "@/lib/extraSettings";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "注册会员" };
 
-export default async function RegPage({ searchParams }: { searchParams: Promise<{ pid?: string }> }) {
-  const sp = await searchParams;
+export default async function RegPage() {
   const extra = await getExtra();
-  const pid = Number(sp.pid) || 0;
   return (
     <div className="mc_reg_wrap">
       <h1>注册会员</h1>
-      {pid ? <p style={{ textAlign: "center", color: "#ff5f00", fontSize: 13, marginTop: -10 }}>通过邀请链接注册，双方均可获得积分</p> : null}
       <ApiForm
         action="/api/user/register"
         captcha={Boolean(extra.captcha.enabled)}
@@ -25,7 +22,6 @@ export default async function RegPage({ searchParams }: { searchParams: Promise<
           { name: "user_email", label: "邮箱", type: "email", placeholder: "选填" },
           { name: "user_question", label: "密保问题", placeholder: "选填，用于找回密码" },
           { name: "user_answer", label: "密保答案", placeholder: "选填" },
-          { name: "user_pid", label: "邀请人", defaultValue: pid ? String(pid) : "", hidden: true },
         ]}
       />
       <div className="mc_reg_links">

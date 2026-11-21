@@ -19,7 +19,7 @@ export default async function ResourceListPage({
   const def = getResource(resource);
   if (!def) notFound();
   const page = Math.max(1, Number(sp.page) || 1);
-  const size = 20;
+  const size = def.key === "type" ? 50 : 20;
   const q = (sp.q || "").trim();
   const where: Record<string, unknown> = {};
   if (q && def.searchFields.length) {
@@ -30,10 +30,26 @@ export default async function ResourceListPage({
     findMany: (args: unknown) => Promise<Record<string, unknown>[]>;
     count: (args: unknown) => Promise<number>;
   };
-  const [total, list] = await Promise.all([
-    db.count({ where }),
-    db.findMany({ where, orderBy: defaultOrder(def), skip: (page - 1) * size, take: size }),
-  ]);
+  let total: number;
+  let list: Record<string, unknown>[];
+  if (def.key === "type") {
+    const all = (await db.findMany({ where, orderBy: { typeSort: "asc" }, take: 500 })) as Record<string, unknown>[];
+    const bySort = (a: Record<string, unknown>, b: Record<string, unknown>) => Number(a.typeSort) - Number(b.typeSort);
+    const parents = all.filter((r) => Number(r.typePid) === 0).sort(bySort);
+    const ordered: Record<string, unknown>[] = [];
+    for (const p of parents) {
+      ordered.push(p);
+      ordered.push(...all.filter((r) => Number(r.typePid) === Number(p.typeId)).sort(bySort));
+    }
+    for (const r of all) if (!ordered.includes(r)) ordered.push(r);
+    total = all.length;
+    list = ordered.slice((page - 1) * size, page * size);
+  } else {
+    [total, list] = await Promise.all([
+      db.count({ where }),
+      db.findMany({ where, orderBy: defaultOrder(def), skip: (page - 1) * size, take: size }),
+    ]);
+  }
   const pageCount = Math.max(1, Math.ceil(total / size));
   const typeRows = def.columns.some((c) => c.kind === "type")
     ? await prisma.type.findMany({ select: { typeId: true, typeName: true } })
@@ -51,7 +67,11 @@ export default async function ResourceListPage({
         </span>
       );
     }
-    if (col.kind === "type") return typeMap.get(Number(v)) || String(v);
+    if (col.kind === "type") return Number(v) === 0 ? "顶级" : typeMap.get(Number(v)) || String(v);
+    if (col.kind === "system") return <span className={`rounded-full px-2 py-0.5 text-xs ${Number(v) === 1 ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-500"}`}>{Number(v) === 1 ? "系统默认" : "-"}</span>;
+    if (def.key === "type" && col.key === "typeName" && Number(row.typePid) > 0) {
+      return <span><span className="pr-1 text-text-tertiary">└</span>{String(v)}</span>;
+    }
     if (col.kind === "truncate") return String(v).slice(0, 40);
     return String(v);
   };
@@ -120,7 +140,11 @@ export default async function ResourceListPage({
                     >
                       编辑
                     </Link>
-                    <DeleteButton resource={def.key} id={Number(row[def.idField])} />
+                    {def.key === "type" && Number(row.typeSystem) === 1 ? (
+                      <span className="text-xs text-text-tertiary">默认分组</span>
+                    ) : (
+                      <DeleteButton resource={def.key} id={Number(row[def.idField])} />
+                    )}
                   </td>
                 </tr>
               ))}

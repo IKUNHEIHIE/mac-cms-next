@@ -1,6 +1,63 @@
+import { createHash } from "node:crypto";
 import { prisma } from "./db";
+import { safeFetch } from "./net";
+import { typeSeoFor } from "./typeSeo";
 
 export const LZ_API = "https://lzizy.net/api.php/provide/vod/";
+
+export type CollectBindings = Record<number, number>;
+
+function normalizeApi(api: string) {
+  return api.trim().replace(/\/+$/, "");
+}
+
+export function apiFlag(api: string) {
+  return createHash("md5").update(normalizeApi(api)).digest("hex");
+}
+
+export async function getCollectBindings(api = LZ_API): Promise<CollectBindings> {
+  const row = await prisma.setting.findUnique({ where: { key: "collect_bind" } });
+  if (!row) return {};
+  try {
+    const all = JSON.parse(row.value) as Record<string, number>;
+    const prefix = `${apiFlag(api)}_`;
+    const out: CollectBindings = {};
+    for (const [k, v] of Object.entries(all)) {
+      if (k.startsWith(prefix)) out[Number(k.slice(prefix.length))] = Number(v) || 0;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export async function saveCollectBindings(api: string, bindings: CollectBindings) {
+  const row = await prisma.setting.findUnique({ where: { key: "collect_bind" } });
+  let all: Record<string, number> = {};
+  if (row) {
+    try {
+      all = JSON.parse(row.value) as Record<string, number>;
+    } catch {
+      all = {};
+    }
+  }
+  const prefix = `${apiFlag(api)}_`;
+  for (const k of Object.keys(all)) if (k.startsWith(prefix)) delete all[k];
+  for (const [remote, local] of Object.entries(bindings)) {
+    if (Number(local) > 0) all[`${prefix}${remote}`] = Number(local);
+  }
+  await prisma.setting.upsert({
+    where: { key: "collect_bind" },
+    update: { value: JSON.stringify(all) },
+    create: { key: "collect_bind", value: JSON.stringify(all) },
+  });
+  return bindings;
+}
+
+export async function fetchRemoteTypes(api = LZ_API) {
+  const data = await lzFetch(`${api}?ac=list`);
+  return data.class || [];
+}
 
 type LzClass = { type_id: number; type_pid: number; type_name: string };
 type LzVod = Record<string, string | number | undefined>;
@@ -15,13 +72,15 @@ type LzResponse = {
   class?: LzClass[];
 };
 
+const SYSTEM_PARENT: Record<number, number> = { 35: 1, 46: 2, 52: 4 };
+
 const PLAYER_NOTE: Record<string, string> = {
   liangzi: "量子资源",
   lzm3u8: "LZ线路",
 };
 
 async function lzFetch(url: string): Promise<LzResponse> {
-  const res = await fetch(url, {
+  const res = await safeFetch(url, {
     headers: {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
@@ -58,9 +117,11 @@ function ts(v: unknown) {
 export function mapLzVod(
   v: LzVod,
   typeParent: Record<number, number>,
-  opts: { level?: number } = {},
+  opts: { level?: number; bindings?: CollectBindings } = {},
 ) {
-  const typeId = num(v.type_id);
+  const remoteTypeId = num(v.type_id);
+  const bound = opts.bindings?.[remoteTypeId];
+  const typeId = bound && bound > 0 ? bound : remoteTypeId;
   const vid = num(v.vod_id);
   const hits = Math.abs((vid * 7919) % 90000) + 1200;
   const score = Number(v.vod_score) > 0 ? Number(v.vod_score) : Number(((vid % 30) / 10 + 6.5).toFixed(1));
@@ -157,10 +218,9 @@ export function mapLzVod(
 }
 
 export async function importTypes(api = LZ_API) {
-  const data = await lzFetch(`${api}?ac=list`);
-  const classes = data.class || [];
+  const classes = await fetchRemoteTypes(api);
   const parents: Record<number, number> = {};
-  for (const c of classes) parents[c.type_id] = c.type_pid || 0;
+  for (const c of classes) parents[c.type_id] = SYSTEM_PARENT[c.type_id] ?? c.type_pid ?? 0;
   const extend = JSON.stringify({
     class: "",
     area: "",
@@ -172,13 +232,18 @@ export async function importTypes(api = LZ_API) {
     version: "",
   });
   for (const c of classes) {
+    const seo = typeSeoFor(c.type_id, c.type_name);
     await prisma.type.upsert({
       where: { typeId: c.type_id },
       update: {
         typeName: c.type_name,
-        typePid: c.type_pid || 0,
+        typePid: SYSTEM_PARENT[c.type_id] ?? c.type_pid ?? 0,
         typeStatus: 1,
+        typeSystem: 1,
         typeMid: 1,
+        typeTitle: seo.title,
+        typeDes: seo.description,
+        typeKey: seo.keywords,
       },
       create: {
         typeId: c.type_id,
@@ -186,8 +251,12 @@ export async function importTypes(api = LZ_API) {
         typeEn: `type${c.type_id}`,
         typeSort: c.type_id,
         typeMid: 1,
-        typePid: c.type_pid || 0,
+        typePid: SYSTEM_PARENT[c.type_id] ?? c.type_pid ?? 0,
         typeStatus: 1,
+        typeSystem: 1,
+        typeTitle: seo.title,
+        typeDes: seo.description,
+        typeKey: seo.keywords,
         typeTpl: "type.html",
         typeTplList: "show.html",
         typeTplDetail: "detail.html",
@@ -197,9 +266,10 @@ export async function importTypes(api = LZ_API) {
       },
     });
   }
+  const newsSeo = typeSeoFor(5, "影视资讯");
   await prisma.type.upsert({
     where: { typeId: 5 },
-    update: {},
+    update: { typeSystem: 1, typeTitle: newsSeo.title, typeDes: newsSeo.description, typeKey: newsSeo.keywords },
     create: {
       typeId: 5,
       typeName: "影视资讯",
@@ -208,6 +278,10 @@ export async function importTypes(api = LZ_API) {
       typeMid: 2,
       typePid: 0,
       typeStatus: 1,
+      typeSystem: 1,
+      typeTitle: newsSeo.title,
+      typeDes: newsSeo.description,
+      typeKey: newsSeo.keywords,
       typeTpl: "type.html",
       typeTplList: "art/type.html",
       typeTplDetail: "art/detail.html",
@@ -232,6 +306,7 @@ export async function collectVods(options: {
   const typeRows = await prisma.type.findMany({ select: { typeId: true, typePid: true } });
   const parent: Record<number, number> = {};
   for (const t of typeRows) parent[t.typeId] = t.typePid;
+  const bindings = await getCollectBindings(api);
 
   let imported = 0;
   let updated = 0;
@@ -250,6 +325,7 @@ export async function collectVods(options: {
       seen++;
       const mapped = mapLzVod(list[i], parent, {
         level: options.markLevel && seen <= 12 ? 9 : undefined,
+        bindings,
       });
       if (!mapped.vodId || !mapped.vodName) continue;
       const exists = await prisma.vod.findUnique({ where: { vodId: mapped.vodId }, select: { vodId: true } });

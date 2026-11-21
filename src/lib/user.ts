@@ -18,20 +18,6 @@ export function ipToInt(ip: string | null) {
   return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
 }
 
-export async function addPoints(userId: number, points: number, remarks: string, type = 1) {
-  if (!points) return;
-  await prisma.user.update({ where: { userId }, data: { userPoints: { increment: points } } });
-  await prisma.plog.create({
-    data: {
-      userId,
-      userId1: 0,
-      plogType: type,
-      plogPoints: points,
-      plogTime: Math.floor(Date.now() / 1000),
-      plogRemarks: remarks.slice(0, 100),
-    },
-  });
-}
 
 export function groupIdOf(user: { groupId: string }): number {
   const first = (user.groupId || "2").split(",")[0];

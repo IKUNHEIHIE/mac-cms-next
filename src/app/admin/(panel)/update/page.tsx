@@ -37,7 +37,7 @@ export default async function UpdatePage() {
       </div>
       <div className="rounded-xl border border-card-border bg-card-surface-area p-5 text-sm leading-7 text-text-secondary">
         <p><strong>升级方式：</strong>拉取最新代码后执行 <code>npm install</code>、<code>npx prisma db push</code>、<code>npm run build</code>。</p>
-        <p><strong>安全建议：</strong>上线前修改默认管理员密码、在 .env 设置强随机 AUTH_SECRET，并关闭演示支付。</p>
+        <p><strong>安全建议：</strong>上线前修改默认管理员密码，设置强随机 AUTH_SECRET；HTTPS 部署时设置 COOKIE_SECURE=1，并仅上传可信的播放器文件。</p>
       </div>
     </div>
   );

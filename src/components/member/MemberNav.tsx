@@ -7,14 +7,6 @@ const NAV = [
   { href: "/user/favs", label: "我的收藏", code: 0xe629 },
   { href: "/user/plays", label: "观看历史", code: 0xe624 },
   { href: "/user/downs", label: "我的下载", code: 0xe63c },
-  { href: "/user/buy", label: "积分购买", code: 0xe62a },
-  { href: "/user/orders", label: "我的订单", code: 0xe62a },
-  { href: "/user/pay", label: "在线充值", code: 0xe653 },
-  { href: "/user/cards", label: "充值卡", code: 0xe618 },
-  { href: "/user/cash", label: "积分提现", code: 0xe652 },
-  { href: "/user/reward", label: "邀请奖励", code: 0xe62b },
-  { href: "/user/upgrade", label: "升级 VIP", code: 0xe638 },
-  { href: "/user/plog", label: "积分明细", code: 0xe630 },
   { href: "/user/popedom", label: "我的权限", code: 0xe665 },
 ];
 

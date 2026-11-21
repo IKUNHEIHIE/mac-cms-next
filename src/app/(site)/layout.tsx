@@ -4,6 +4,7 @@ import { getSiteContext } from "@/lib/site";
 import SiteHeader from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
 import { isRequestBlocked } from "@/lib/extraSettings";
+import ThemeRem from "@/components/site/ThemeRem";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const color = COLOR_CSS[settings.theme.color] || "default.css";
   return (
     <>
+      <ThemeRem />
       <link rel="stylesheet" href="/theme/conch/asset/css/mxstyle.css" />
       <link rel="stylesheet" href="/theme/conch/asset/css/hlstyle.css" />
       <link rel="stylesheet" href={`/theme/conch/asset/css/${color}`} />

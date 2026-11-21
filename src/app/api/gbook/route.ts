@@ -2,10 +2,17 @@ import { NextResponse } from "next/server";
 import { isBlockedRequest } from "@/lib/extraSettings";
 import { prisma } from "@/lib/db";
 import { currentUser, ipToInt } from "@/lib/user";
+import { ipFromRequest } from "@/lib/extraSettings";
+import { isRateLimited, recordFailure } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
   if (await isBlockedRequest(request)) return NextResponse.json({ code: 0, msg: "访问受限" }, { status: 403 });
   const user = await currentUser();
+  const limitKey = `gbook:${ipFromRequest(request)}`;
+  if (isRateLimited(limitKey, 10, 60 * 60_000)) {
+    return NextResponse.json({ code: 0, msg: "留言过于频繁，请稍后再试" }, { status: 429 });
+  }
+  recordFailure(limitKey, 60 * 60_000);
   const b = await request.json().catch(() => ({}));
   const content = String(b.content || "").trim();
   if (!content) return NextResponse.json({ code: 0, msg: "留言内容不能为空" }, { status: 400 });

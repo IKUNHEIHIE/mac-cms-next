@@ -51,7 +51,7 @@ export default async function VodDetailPage({ params }: { params: Promise<{ id: 
     commentId: c.commentId,
     commentName: c.commentName,
     commentTime: c.commentTime,
-    commentContent: c.commentContent,
+    commentContent: c.commentContent || "",
     commentUp: c.commentUp,
   }));
 

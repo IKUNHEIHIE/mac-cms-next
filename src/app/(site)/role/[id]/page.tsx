@@ -1,3 +1,4 @@
+import { safeHtml } from "@/lib/sanitize";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -38,7 +39,7 @@ export default async function RolePage({ params }: { params: Promise<{ id: strin
             </p>
             <p style={{ color: "#999", fontSize: "0.33rem" }}>人气：{role.roleHits}</p>
             {role.roleContent ? (
-              <div style={{ color: "#555", lineHeight: 1.9, fontSize: "0.33rem" }} dangerouslySetInnerHTML={{ __html: role.roleContent }} />
+              <div style={{ color: "#555", lineHeight: 1.9, fontSize: "0.33rem" }} dangerouslySetInnerHTML={{ __html: safeHtml(role.roleContent) }} />
             ) : null}
           </div>
         </div>

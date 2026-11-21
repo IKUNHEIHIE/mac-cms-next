@@ -31,7 +31,7 @@ export default async function MemberPage({
           <span className="mb-title">个人中心</span>
         </div>
         <div style={{ padding: "0.3rem 0.3rem 0", color: "#999", fontSize: "0.3rem" }}>
-          {user.userNickName || user.userName} · 积分 {user.userPoints}
+          {user.userNickName || user.userName}
         </div>
         <MemberNav />
         <div style={{ padding: "0.3rem" }}>

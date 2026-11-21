@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { ipFromRequest } from "@/lib/extraSettings";
+import { isRateLimited, recordFailure } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
   const b = await request.json().catch(() => ({}));
+  const limitKey = `findpass:${ipFromRequest(request)}`;
+  if (isRateLimited(limitKey, 5, 60 * 60_000)) {
+    return NextResponse.json({ code: 0, msg: "尝试次数过多，请稍后再试" }, { status: 429 });
+  }
+  recordFailure(limitKey, 60 * 60_000);
   const userName = String(b.user_name || "").trim();
   const answer = String(b.user_answer || "").trim();
   const newPwd = String(b.user_pwd || "");

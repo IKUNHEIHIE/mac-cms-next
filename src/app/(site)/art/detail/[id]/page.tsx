@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { safeHtml } from "@/lib/sanitize";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { poster } from "@/lib/maccms";
@@ -49,7 +50,7 @@ export default async function ArtDetailPage({ params }: { params: Promise<{ id: 
           <div
             className="art_content"
             style={{ fontSize: "0.36rem", lineHeight: 1.9, color: "#444" }}
-            dangerouslySetInnerHTML={{ __html: art.artContent || "<p>暂无内容</p>" }}
+            dangerouslySetInnerHTML={{ __html: safeHtml(art.artContent || "<p>暂无内容</p>") }}
           />
         </div>
       </div>

@@ -22,9 +22,9 @@ export default async function CollectPage() {
             当前影片 {vodCount} 部，最近更新：{lastVod ? `${lastVod.vodName}（${fmtTime(lastVod.vodTime, true)}）` : "暂无"}
           </p>
         </div>
-        <Link href="/admin/manage/collect" className="text-sm text-primary-500">
-          管理采集节点 →
-        </Link>
+        <div className="flex items-center gap-4 text-sm">
+          <Link href="/admin/manage/collect" className="text-primary-500">管理采集节点 →</Link>
+        </div>
       </div>
 
       <CollectForm defaultApi={LZ_API} />

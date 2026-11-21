@@ -4,7 +4,6 @@ import {
   CalendarIcon,
   ChatIcon,
   HomeIcon,
-  InvoiceIcon,
   LetterIcon,
   PieChartIcon,
   TableIcon,
@@ -44,10 +43,6 @@ export const NAV_DATA: NavSection[] = [
       { title: "分类管理", url: "/admin/manage/type", icon: <AlphabetIcon />, items: [] },
       { title: "会员组", url: "/admin/manage/group", icon: <UserGroupIcon />, items: [] },
       { title: "会员管理", url: "/admin/manage/user", icon: <UserIcon />, items: [] },
-      { title: "订单管理", url: "/admin/manage/order", icon: <InvoiceIcon />, items: [] },
-      { title: "充值卡", url: "/admin/manage/card", icon: <TaskIcon />, items: [] },
-      { title: "提现审核", url: "/admin/manage/cash", icon: <InvoiceIcon />, items: [] },
-      { title: "积分日志", url: "/admin/manage/plog", icon: <LetterIcon />, items: [] },
     ],
   },
   {
@@ -75,7 +70,7 @@ export const NAV_DATA: NavSection[] = [
     label: "采集与系统",
     items: [
       { title: "资源采集", url: "/admin/collect", icon: <TaskIcon />, items: [] },
-      { title: "全量采集", url: "/admin/collect-all", icon: <PieChartIcon />, items: [] },
+            { title: "全量采集", url: "/admin/collect-all", icon: <PieChartIcon />, items: [] },
       { title: "采集节点", url: "/admin/manage/collect", icon: <TaskIcon />, items: [] },
       { title: "文章采集", url: "/admin/cjrun", icon: <TaskIcon />, items: [] },
       { title: "文章采集节点", url: "/admin/manage/cjnode", icon: <LetterIcon />, items: [] },

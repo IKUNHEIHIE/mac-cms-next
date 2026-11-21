@@ -2,14 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 
+export type CustomPlayer = { file: string; kind: "html" | "js"; name?: string };
+
 export default function Player({
   src,
   poster,
   title,
+  from,
+  custom,
 }: {
   src: string;
   poster?: string;
   title?: string;
+  from?: string;
+  custom?: CustomPlayer;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState("");
@@ -54,6 +60,26 @@ export default function Player({
     return (
       <div className="play_tips">
         <h3>抱歉，暂无播放地址</h3>
+      </div>
+    );
+  }
+
+  if (custom) {
+    const qs = new URLSearchParams({ url: src, poster: poster || "", title: title || "", from: from || "" });
+    const iframeSrc =
+      custom.kind === "js"
+        ? `/player/host?${new URLSearchParams({ file: custom.file, ...Object.fromEntries(qs) }).toString()}`
+        : `${custom.file}${custom.file.includes("?") ? "&" : "?"}${qs.toString()}`;
+    return (
+      <div className="MacPlayer">
+        <iframe
+          src={iframeSrc}
+          title={title || "播放器"}
+          allowFullScreen
+          referrerPolicy="no-referrer"
+          sandbox="allow-scripts allow-forms allow-popups allow-presentation"
+          style={{ border: 0, width: "100%", height: "100%", position: "absolute", inset: 0 }}
+        />
       </div>
     );
   }

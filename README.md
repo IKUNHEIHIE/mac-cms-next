@@ -64,20 +64,20 @@ npm run build && npm start
 - 搜索：关键词 + 分类/地区/年份筛选
 - 文章：分类列表、详情
 - 专题、演员、角色、网址导航、漫画、排行榜、最新更新、留言板、RSS、免责声明
-- 会员中心：登录/注册/找回密码、资料修改、收藏、观看历史、下载、积分购买、订单、在线充值、充值卡、提现、邀请奖励、VIP 升级、积分明细、权限
-- 评论、观看历史自动记录、积分变动记录
+- 会员中心：登录/注册/找回密码、资料修改、收藏、观看历史、下载、权限
+- 评论、观看历史自动记录
 - 苹果CMS v10 兼容数据接口：`/api/provide/vod`（`ac=list` / `ac=detail`，支持 `t/pg/wd/ids/limit`；`/api.php/provide/vod` 亦可）
 
 ### 后台（NextAdmin）
 - 控制台、数据统计（14 天趋势）
 - 内容：视频、文章、专题、演员、角色、漫画、网站导航
 - 分类：分类（含筛选 JSON）、会员组
-- 会员：会员、订单、充值卡、提现审核、积分日志
+- 会员：会员、会员组
 - 互动：评论、留言、站内消息、友情链接
 - 采集：资源采集（分类导入、按分类/页数采集、自动更新）、采集节点、文章采集（正则规则抓取，MD5 去重）
+- 已移除：订单、充值卡、提现、积分日志、积分购买、在线充值、邀请奖励、VIP 升级及全部积分/支付能力（后台与会员端）。
 - 运营工具：广告位（首页/列表/搜索/详情右侧/播放页）、播放器线路名称、IP 黑名单、登录验证码、定时任务、百度 URL 推送、媒体库、域名记录
 - 系统：站点/主题设置、数据库概况 / JSON 导出 / JSON 导入、管理员、访问日志、播放日志、附件、模板对照、文件上传、缓存刷新、系统信息
-- 订单确认到账与提现拒绝退回积分联动；采集后可按需由 Cron 执行
 - 全量 CRUD 由统一资源接口 `/api/admin/resource/[resource]` 提供，字段白名单、Int 类型转换与状态联动在 `src/lib/adminResources.ts` / `src/app/api/admin/resource/[resource]/route.ts`
 
 ### 定时任务与 URL 推送
@@ -97,7 +97,7 @@ curl -X POST -H "x-cron-secret: $CRON_SECRET" "http://localhost:3000/api/cron?fo
 
 ```
 prisma/
-  schema.prisma        # 27 张 mac_* 业务表 + 设置表
+  schema.prisma        # 23 张 mac_* 业务表 + 设置表
   seed.ts              # 初始化 + 资源站采集
 public/theme/conch/    # 792 主题静态资源（css/js/fonts/img）
 src/app/(site)/        # 前台路由（792 主题）
@@ -118,7 +118,7 @@ src/lib/               # db、auth、设置、采集、MACCMS 工具
 - 设计文档：`docs/superpowers/specs/2026-11-21-maccms-nextjs-design.md`
 ## 与苹果CMS的差异（架构替代 / 外部依赖）
 
-- **真实支付、QQ/微信 OAuth、短信/邮件验证码**：需要第三方商户号/AppID/SMTP 凭据，当前保留演示支付与验证码（算术验证码）流程，配置凭据后可继续接入。
+- **QQ/微信 OAuth、短信/邮件验证码**：需要第三方 AppID/SMTP 凭据；项目已不包含任何支付或积分能力。
 - **插件市场（Addon）**：Next.js 以模块化路由与组件扩展替代，业务插件作为独立模块接入。
 - **静态 HTML 生成**：以 SSR + 「缓存刷新」替代逐页生成，后台「缓存与生成」提供一键刷新。
 - **定时任务 / URL 推送**：已实现 `/api/cron` 与百度主动推送，可通过系统 Cron 或部署平台触发。
@@ -136,3 +136,13 @@ npx tsx scripts/collect-all.ts --from 41 # 回补指定页之后
 - 进度写入 `mac_setting.collect_all_state`，后台「采集与系统 → 全量采集」可实时查看进度、入库数、失败页与预计剩余时间。
 - 采集完成后执行 `npx tsx scripts/verify-data.ts` 核对总数、缺失字段与分类分布。
 
+
+## 安全加固
+
+- **密钥**：`AUTH_SECRET` 必须为随机长字符串；生产环境缺失或过弱会直接拒绝启动。HTTPS 部署时设置 `COOKIE_SECURE=1`。
+- **后台账号**：默认 `admin/admin123` 仅用于本地初始化，控制台会持续提示修改；登录接口按 IP + 账号双维度限速。
+- **上传与播放器**：文件名随机化；HTML/SVG 直接访问强制下载，iframe 播放器使用无 `allow-same-origin` 的 sandbox；JS 播放器仅在沙箱宿主页运行。仅上传可信播放器文件。
+- **SSRF**：采集接口、文章采集、播放器线路探测统一校验 http/https，并拒绝回环、内网、链路本地与保留地址；重定向逐跳校验。
+- **XSS**：文章/专题/演员/角色/网址正文统一经过 `sanitize-html` 清洗后再渲染；上传播放器与媒体响应附加 CSP/沙箱与 `nosniff`。
+- **安全响应头**：`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy`、基础 CSP。
+- **数据库**：便携 MySQL 仅监听 127.0.0.1；生产环境请设置 root 密码、限制网络访问并定期备份。

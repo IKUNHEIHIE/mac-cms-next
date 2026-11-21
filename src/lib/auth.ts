@@ -1,9 +1,11 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "mac-cms-next-dev-secret-change-me",
-);
+const rawSecret = process.env.AUTH_SECRET;
+if (process.env.NODE_ENV === "production" && (!rawSecret || rawSecret.length < 32 || rawSecret.includes("dev-secret"))) {
+  throw new Error("AUTH_SECRET is missing or too weak; set a random value of at least 32 characters");
+}
+const secret = new TextEncoder().encode(rawSecret || "mac-cms-next-dev-secret-change-me");
 
 export const USER_COOKIE = "mac_user";
 export const ADMIN_COOKIE = "mac_admin";
@@ -22,7 +24,7 @@ export async function signToken(payload: Record<string, unknown>, hours = 24 * 3
 export async function verifyToken<T>(token: string | undefined): Promise<T | null> {
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
     return payload as T;
   } catch {
     return null;
@@ -36,6 +38,7 @@ export async function setAuthCookie(name: string, token: string) {
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
+    secure: process.env.COOKIE_SECURE === "1",
   });
 }
 

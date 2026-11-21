@@ -4,8 +4,17 @@ import { prisma } from "@/lib/db";
 import Pagination from "@/components/site/Pagination";
 import { pageParam } from "@/lib/site";
 import { poster } from "@/lib/maccms";
+import { typeSeoFor } from "@/lib/typeSeo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const type = await prisma.type.findUnique({ where: { typeId: Number(id) } });
+  if (!type) return { title: "影视资讯" };
+  const seo = typeSeoFor(type.typeId, type.typeName);
+  return { title: type.typeTitle || seo.title, description: type.typeDes || seo.description, keywords: type.typeKey || seo.keywords };
+}
 
 export default async function ArtTypePage({
   params,
@@ -25,6 +34,8 @@ export default async function ArtTypePage({
     prisma.art.count({ where: { typeId, artStatus: 1 } }),
     prisma.art.findMany({ where: { typeId, artStatus: 1 }, orderBy: { artTime: "desc" }, skip: (page - 1) * size, take: size }),
   ]);
+  const seo = typeSeoFor(type.typeId, type.typeName);
+  const intro = type.typeDes || seo.description;
   const pageCount = Math.max(1, Math.ceil(total / size));
   return (
     <div className="container">
@@ -33,6 +44,7 @@ export default async function ArtTypePage({
           <span className="pull_right">共 {total} 篇文章</span>
           <h2 className="title">{type.typeName}</h2>
         </div>
+        <p className="mc_type_intro">{intro}</p>
         <ul className="artlist clearfix" style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {list.map((a) => (
             <li key={a.artId} className="artlist_item" style={{ padding: "0.25rem 0", borderBottom: "1px dashed #f0f0f0" }}>

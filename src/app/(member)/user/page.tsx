@@ -11,12 +11,11 @@ export const metadata = { title: "个人中心" };
 export default async function UserIndexPage() {
   const user = await currentUser();
   if (!user) redirect("/user/login");
-  const [group, favs, plays, orders, invites] = await Promise.all([
+  const [group, favs, plays, downloads] = await Promise.all([
     prisma.group.findFirst({ where: { groupId: Number((user.groupId || "2").split(",")[0]) || 2 } }),
     prisma.ulog.count({ where: { userId: user.userId, ulogType: 1 } }),
     prisma.ulog.count({ where: { userId: user.userId, ulogType: 4 } }),
-    prisma.order.count({ where: { userId: user.userId } }),
-    prisma.user.count({ where: { userPid: user.userId } }),
+    prisma.ulog.count({ where: { userId: user.userId, ulogType: 3 } }),
   ]);
   return (
     <MemberPage
@@ -30,10 +29,6 @@ export default async function UserIndexPage() {
       <h2>我的资料</h2>
       <div className="mc_stat_grid">
         <div className="mc_stat_card">
-          <b>{user.userPoints}</b>
-          <span>账户积分</span>
-        </div>
-        <div className="mc_stat_card">
           <b>{favs}</b>
           <span>我的收藏</span>
         </div>
@@ -42,8 +37,8 @@ export default async function UserIndexPage() {
           <span>观看记录</span>
         </div>
         <div className="mc_stat_card">
-          <b>{orders}</b>
-          <span>充值订单</span>
+          <b>{downloads}</b>
+          <span>下载记录</span>
         </div>
       </div>
       <p><span className="xiang">用户名：</span>{user.userName}</p>
@@ -57,7 +52,6 @@ export default async function UserIndexPage() {
       <p><span className="xiang">注册时间：</span>{fmtTime(user.userRegTime, true)}</p>
       <p><span className="xiang">上次登录：</span>{fmtTime(user.userLastLoginTime, true)}</p>
       <p><span className="xiang">登录次数：</span>{user.userLoginNum}</p>
-      <p><span className="xiang">邀请人数：</span>{invites} 人</p>
     </MemberPage>
   );
 }

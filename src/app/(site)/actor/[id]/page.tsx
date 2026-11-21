@@ -1,3 +1,4 @@
+import { safeHtml } from "@/lib/sanitize";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import VodCard from "@/components/site/VodCard";
@@ -51,7 +52,7 @@ export default async function ActorDetailPage({ params }: { params: Promise<{ id
               <li>人气：{actor.actorHits}</li>
             </ul>
             {actor.actorContent ? (
-              <div style={{ color: "#555", lineHeight: 1.9, fontSize: "0.33rem" }} dangerouslySetInnerHTML={{ __html: actor.actorContent }} />
+              <div style={{ color: "#555", lineHeight: 1.9, fontSize: "0.33rem" }} dangerouslySetInnerHTML={{ __html: safeHtml(actor.actorContent) }} />
             ) : null}
           </div>
         </div>

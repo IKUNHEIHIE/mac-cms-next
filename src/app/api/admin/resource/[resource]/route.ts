@@ -110,34 +110,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ reso
   if (!id) return NextResponse.json({ code: 0, msg: "缺少 ID" }, { status: 400 });
   const data = await buildData(def, body, false);
   try {
-    const db = delegate(def.model);
-    const before = await db.findUnique({ where: { [def.idField]: id } });
-    if (!before) return NextResponse.json({ code: 0, msg: "记录不存在" }, { status: 404 });
-    const statusKey = def.key === "order" ? "orderStatus" : def.key === "cash" ? "cashStatus" : "";
-    const oldStatus = statusKey ? Number((before as Record<string, unknown>)[statusKey]) : 0;
-    const newStatusRaw = statusKey ? (data as Record<string, unknown>)[statusKey] : undefined;
-    const newStatus = newStatusRaw === undefined ? oldStatus : Number(newStatusRaw);
-    const now = Math.floor(Date.now() / 1000);
-    if (def.key === "order" && oldStatus !== 1 && newStatus === 1 && !data.orderPayTime) data.orderPayTime = now;
-    if (def.key === "cash" && newStatus === 1 && !data.cashTimeAudit) data.cashTimeAudit = now;
-    const row = await db.update({ where: { [def.idField]: id }, data });
-
-    if (def.key === "order" && oldStatus !== 1 && newStatus === 1) {
-      const userId = Number((before as Record<string, unknown>).userId);
-      const points = Number((before as Record<string, unknown>).orderPoints) || 0;
-      if (userId && points > 0) {
-        await prisma.user.update({ where: { userId }, data: { userPoints: { increment: points } } }).catch(() => {});
-        await prisma.plog.create({ data: { userId, plogType: 1, plogPoints: points, plogTime: now, plogRemarks: "管理员确认订单到账" } }).catch(() => {});
-      }
-    }
-    if (def.key === "cash" && oldStatus === 0 && newStatus === 2) {
-      const userId = Number((before as Record<string, unknown>).userId);
-      const points = Number((before as Record<string, unknown>).cashPoints) || 0;
-      if (userId && points > 0) {
-        await prisma.user.update({ where: { userId }, data: { userPoints: { increment: points } } }).catch(() => {});
-        await prisma.plog.create({ data: { userId, plogType: 1, plogPoints: points, plogTime: now, plogRemarks: "提现被拒绝，积分退回" } }).catch(() => {});
-      }
-    }
+    const row = await delegate(def.model).update({ where: { [def.idField]: id }, data });
     return NextResponse.json({ code: 1, msg: "保存成功", row });
   } catch (e) {
     return NextResponse.json({ code: 0, msg: e instanceof Error ? e.message : "保存失败" }, { status: 400 });
@@ -153,6 +126,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ r
   const id = Number(body.id);
   if (!id) return NextResponse.json({ code: 0, msg: "缺少 ID" }, { status: 400 });
   try {
+    if (def.key === "type") {
+      const row = (await delegate(def.model).findUnique({ where: { [def.idField]: id } })) as Record<string, unknown> | null;
+      if (!row) return NextResponse.json({ code: 0, msg: "记录不存在" }, { status: 404 });
+      if (Number(row.typeSystem) === 1) {
+        return NextResponse.json({ code: 0, msg: "系统默认分组不可删除" }, { status: 400 });
+      }
+    }
     await delegate(def.model).delete({ where: { [def.idField]: id } });
     return NextResponse.json({ code: 1, msg: "已删除" });
   } catch (e) {

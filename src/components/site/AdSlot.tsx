@@ -5,6 +5,7 @@ export default async function AdSlot({ slot }: { slot: keyof AdsConfig }) {
   const extra = await getExtra();
   const ad = extra.ads[slot];
   if (!ad?.enabled) return null;
+  const link = /^https?:\/\//i.test(ad.link) || ad.link.startsWith("/") ? ad.link : "";
   const inner = ad.pic ? (
     <span
       className="mc_ad"
@@ -19,11 +20,11 @@ export default async function AdSlot({ slot }: { slot: keyof AdsConfig }) {
   );
   return (
     <div className="mc_ad_wrap">
-      {ad.link ? (
-        /^https?:/i.test(ad.link) ? (
-          <a href={ad.link} target="_blank" rel="noreferrer sponsored">{inner}</a>
+      {link ? (
+        /^https?:/i.test(link) ? (
+          <a href={link} target="_blank" rel="noreferrer sponsored">{inner}</a>
         ) : (
-          <Link href={ad.link}>{inner}</Link>
+          <Link href={link}>{inner}</Link>
         )
       ) : (
         inner

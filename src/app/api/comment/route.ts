@@ -3,6 +3,8 @@ import { isBlockedRequest } from "@/lib/extraSettings";
 import { prisma } from "@/lib/db";
 import { currentUser } from "@/lib/user";
 import { ipToInt } from "@/lib/user";
+import { ipFromRequest } from "@/lib/extraSettings";
+import { isRateLimited, recordFailure } from "@/lib/rateLimit";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -20,6 +22,11 @@ export async function POST(request: Request) {
   if (await isBlockedRequest(request)) return NextResponse.json({ code: 0, msg: "访问受限" }, { status: 403 });
   const user = await currentUser();
   if (!user) return NextResponse.json({ code: 0, msg: "请先登录后评论" }, { status: 401 });
+  const limitKey = `comment:${ipFromRequest(request)}`;
+  if (isRateLimited(limitKey, 30, 10 * 60_000)) {
+    return NextResponse.json({ code: 0, msg: "评论过于频繁，请稍后再试" }, { status: 429 });
+  }
+  recordFailure(limitKey, 10 * 60_000);
   const b = await request.json().catch(() => ({}));
   const content = String(b.content || "").trim();
   const rid = Number(b.rid);

@@ -38,10 +38,6 @@ async function main() {
         groupStatus: 1,
         groupType: ",1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,",
         groupPopedom: g.popedom,
-        groupPointsDay: g.id === 3 ? 10 : 0,
-        groupPointsWeek: g.id === 3 ? 70 : 0,
-        groupPointsMonth: g.id === 3 ? 300 : 0,
-        groupPointsYear: g.id === 3 ? 3600 : 0,
       },
     });
   }
@@ -67,7 +63,6 @@ async function main() {
         userPwd: pwdUser,
         userNickName: "演示会员",
         userEmail: "demo@example.com",
-        userPoints: 1000,
         userStatus: 1,
         userRegTime: now(),
         userEndTime: now() + 86400 * 365,
@@ -246,36 +241,6 @@ async function main() {
         });
       }
     }
-    await prisma.order.upsert({
-      where: { orderId: 1 },
-      update: {},
-      create: {
-        orderId: 1,
-        userId: demoUser.userId,
-        orderStatus: 1,
-        orderCode: `MAC${Date.now()}`,
-        orderPrice: 30,
-        orderTime: now() - 86400,
-        orderPoints: 300,
-        orderPayType: "alipay",
-        orderPayTime: now() - 86000,
-        orderRemarks: "VIP 月度充值",
-      },
-    });
-    await prisma.card.upsert({
-      where: { cardId: 1 },
-      update: {},
-      create: {
-        cardId: 1,
-        cardNo: "MAC888888",
-        cardPwd: "888888",
-        cardMoney: 30,
-        cardPoints: 300,
-        cardUseStatus: 0,
-        cardSaleStatus: 1,
-        cardAddTime: now(),
-      },
-    });
   }
 
   for (const key of ["site", "theme"] as const) {

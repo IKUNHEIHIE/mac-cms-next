@@ -6,6 +6,7 @@ import AdSlot from "@/components/site/AdSlot";
 import { prisma } from "@/lib/db";
 import { getSiteContext, typeFilters, pageParam } from "@/lib/site";
 import type { Prisma } from "@prisma/client";
+import { typeSeoFor } from "@/lib/typeSeo";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,13 @@ type Search = { page?: string; by?: string; class?: string; area?: string; year?
 export async function generateMetadata({ params }: { params: Promise<Params> }) {
   const { id } = await params;
   const type = await prisma.type.findUnique({ where: { typeId: Number(id) } });
-  return { title: type?.typeName || "影视分类" };
+  if (!type) return { title: "影视分类" };
+  const seo = typeSeoFor(type.typeId, type.typeName);
+  return {
+    title: type.typeTitle || seo.title,
+    description: type.typeDes || seo.description,
+    keywords: type.typeKey || seo.keywords,
+  };
 }
 
 export default async function TypePage({
@@ -37,6 +44,8 @@ export default async function TypePage({
     where: { typePid: typeId, typeStatus: 1 },
     orderBy: { typeSort: "asc" },
   });
+  const seo = typeSeoFor(type.typeId, type.typeName);
+  const intro = type.typeDes || seo.description;
   const filters = typeFilters(type.typeExtend);
   const page = pageParam(sp.page);
   const size = 36;
@@ -89,6 +98,8 @@ export default async function TypePage({
               ))}
             </span>
           </div>
+
+          <p className="mc_type_intro">{intro}</p>
 
           <div className="wrapper_fl wrapper_tm" style={{ borderTop: 0 }}>
             <ul className="screen_list sx_tz clearfix" style={{ float: "left", listStyle: "none", margin: 0, padding: 0 }}>

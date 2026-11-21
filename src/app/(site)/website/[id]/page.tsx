@@ -1,3 +1,4 @@
+import { safeHtml } from "@/lib/sanitize";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -25,7 +26,7 @@ export default async function WebsiteDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
         {site.websiteContent ? (
-          <div style={{ marginTop: "0.4rem", lineHeight: 1.9, color: "#555" }} dangerouslySetInnerHTML={{ __html: site.websiteContent }} />
+          <div style={{ marginTop: "0.4rem", lineHeight: 1.9, color: "#555" }} dangerouslySetInnerHTML={{ __html: safeHtml(site.websiteContent) }} />
         ) : null}
         <p style={{ marginTop: "0.4rem" }}>
           <Link href="/website">← 返回网址导航</Link>

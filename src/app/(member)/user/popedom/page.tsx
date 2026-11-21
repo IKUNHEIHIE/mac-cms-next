@@ -32,9 +32,6 @@ export default async function PopedomPage() {
           ))}
         </tbody>
       </table>
-      <p style={{ marginTop: 16, color: "#999" }}>
-        会员组积分赠送：日 {group?.groupPointsDay || 0} / 周 {group?.groupPointsWeek || 0} / 月 {group?.groupPointsMonth || 0}
-      </p>
     </MemberPage>
   );
 }

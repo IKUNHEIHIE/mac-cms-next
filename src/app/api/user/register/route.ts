@@ -4,10 +4,17 @@ import { verifyCaptcha } from "@/lib/captcha";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { USER_COOKIE, setAuthCookie, signToken } from "@/lib/auth";
-import { addPoints, ipToInt } from "@/lib/user";
+import { ipToInt } from "@/lib/user";
+import { ipFromRequest } from "@/lib/extraSettings";
+import { isRateLimited, recordFailure } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
   if (await isBlockedRequest(request)) return NextResponse.json({ code: 0, msg: "访问受限" }, { status: 403 });
+  const limitKey = `register:${ipFromRequest(request)}`;
+  if (isRateLimited(limitKey, 10, 60 * 60_000)) {
+    return NextResponse.json({ code: 0, msg: "注册过于频繁，请稍后再试" }, { status: 429 });
+  }
+  recordFailure(limitKey, 60 * 60_000);
   const b = await request.json().catch(() => ({}));
   const extra = await getExtra();
   if (extra.captcha.enabled && !verifyCaptcha(String(b.captcha_token || ""), String(b.captcha_answer || ""))) {
@@ -26,8 +33,6 @@ export async function POST(request: Request) {
   if (exists) return NextResponse.json({ code: 0, msg: "该账号已被注册" }, { status: 400 });
 
   const now = Math.floor(Date.now() / 1000);
-  const pid = Math.floor(Number(b.user_pid) || 0);
-  const inviter = pid > 0 ? await prisma.user.findUnique({ where: { userId: pid } }) : null;
   const user = await prisma.user.create({
     data: {
       groupId: "2",
@@ -36,18 +41,12 @@ export async function POST(request: Request) {
       userNickName: userName,
       userEmail: email,
       userStatus: 1,
-      userPoints: 0,
       userRegTime: now,
       userRegIp: ipToInt(request.headers.get("x-forwarded-for")),
       userQuestion: String(b.user_question || "").slice(0, 255),
       userAnswer: String(b.user_answer || "").slice(0, 255),
-      userPid: inviter ? inviter.userId : 0,
     },
   });
-  if (inviter) {
-    await addPoints(inviter.userId, 50, `邀请会员 ${userName} 注册奖励`, 5);
-    await addPoints(user.userId, 20, "受邀注册奖励", 5);
-  }
   const token = await signToken({ uid: user.userId, name: user.userName });
   await setAuthCookie(USER_COOKIE, token);
   return NextResponse.json({ code: 1, msg: "注册成功" });

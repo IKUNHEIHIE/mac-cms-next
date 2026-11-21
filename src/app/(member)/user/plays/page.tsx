@@ -24,7 +24,7 @@ export default async function PlaysPage() {
           const v = vods.find((x) => x.vodId === l.ulogRid);
           if (!v) return null;
           return (
-            <li key={l.ulogId} style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: "1px dashed #f0f0f0" }}>
+            <li key={l.ulogId} className="mc_list_row" style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: "1px dashed #f0f0f0" }}>
               <Link
                 href={`/vod/play/${v.vodId}/${l.ulogSid || 1}/${l.ulogNid || 1}`}
                 style={{

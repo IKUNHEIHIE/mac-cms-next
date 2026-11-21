@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { fmtTime } from "@/lib/maccms";
+import { getSessionAdmin } from "@/lib/auth";
+import bcrypt from "bcryptjs";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "控制台" };
@@ -9,27 +11,34 @@ const CARDS = [
   { key: "vod", label: "影片总数", href: "/admin/manage/vod", color: "from-[#5750F1] to-[#8b7bff]" },
   { key: "user", label: "会员总数", href: "/admin/manage/user", color: "from-[#ff5f00] to-[#ff9a5f]" },
   { key: "comment", label: "评论总数", href: "/admin/manage/comment", color: "from-[#00b8a9] to-[#66dcd0]" },
-  { key: "order", label: "订单总数", href: "/admin/manage/order", color: "from-[#f6416c] to-[#ff9a9e]" },
 ] as const;
 
 export default async function AdminDashboard() {
-  const [vodCount, userCount, commentCount, orderCount, todayVod, latestVods, latestUsers, latestComments, gbookCount, typeCount] =
+  const [vodCount, userCount, commentCount, todayVod, latestVods, latestUsers, latestComments, gbookCount, typeCount] =
     await Promise.all([
       prisma.vod.count(),
       prisma.user.count(),
       prisma.comment.count(),
-      prisma.order.count(),
       prisma.vod.count({ where: { vodTime: { gte: Math.floor(Date.now() / 1000) - 86400 } } }),
       prisma.vod.findMany({ orderBy: { vodTime: "desc" }, take: 8, select: { vodId: true, vodName: true, vodTime: true, vodRemarks: true } }),
-      prisma.user.findMany({ orderBy: { userRegTime: "desc" }, take: 6, select: { userId: true, userName: true, userPoints: true, userRegTime: true } }),
+      prisma.user.findMany({ orderBy: { userRegTime: "desc" }, take: 6, select: { userId: true, userName: true, userRegTime: true } }),
       prisma.comment.findMany({ orderBy: { commentTime: "desc" }, take: 6, select: { commentId: true, commentName: true, commentContent: true, commentTime: true } }),
       prisma.gbook.count({ where: { gbookStatus: 1 } }),
       prisma.type.count(),
     ]);
-  const counts: Record<string, number> = { vod: vodCount, user: userCount, comment: commentCount, order: orderCount };
+  const session = await getSessionAdmin();
+  const admin = session ? await prisma.admin.findUnique({ where: { adminId: session.aid } }) : null;
+  const defaultPwd = admin ? await bcrypt.compare("admin123", admin.adminPwd) : false;
+  const counts: Record<string, number> = { vod: vodCount, user: userCount, comment: commentCount };
 
   return (
     <div className="space-y-6">
+      {defaultPwd ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          当前管理员仍在使用的初始密码 admin123，存在被暴力破解的风险。
+          {admin ? <Link href={`/admin/manage/admin/${admin.adminId}`} className="ml-2 font-semibold underline">立即修改密码</Link> : null}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">控制台</h1>
@@ -47,7 +56,7 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {CARDS.map((c) => (
           <Link key={c.key} href={c.href} className="group overflow-hidden rounded-2xl border border-card-border bg-card-surface-area p-5 transition hover:shadow-md">
             <div className={`mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${c.color} text-white`}>●</div>
@@ -86,7 +95,7 @@ export default async function AdminDashboard() {
                 <Link href={`/admin/manage/user/${u.userId}`} className="text-text-secondary hover:text-primary-500">
                   {u.userName}
                 </Link>
-                <span className="text-xs text-text-tertiary">{u.userPoints} 积分 · {fmtTime(u.userRegTime)}</span>
+                <span className="text-xs text-text-tertiary">{fmtTime(u.userRegTime)}</span>
               </li>
             ))}
           </ul>

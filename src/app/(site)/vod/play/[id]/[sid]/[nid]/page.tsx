@@ -52,21 +52,37 @@ export default async function PlayPage({
   const prev = nid > 1 ? source.urls[nid - 2] : null;
   const next = nid < source.urls.length ? source.urls[nid] : null;
 
-  const [related, rankVods, types, comments, session, type] = await Promise.all([
+  const [related, rankVods, types, comments, session, type, playerRows] = await Promise.all([
     prisma.vod.findMany({ where: { typeId: vod.typeId, vodId: { not: vod.vodId } }, orderBy: { vodTime: "desc" }, take: 12 }),
     prisma.vod.findMany({ orderBy: { vodHits: "desc" }, take: 10 }),
     prisma.type.findMany({ select: { typeId: true, typeName: true } }),
     prisma.comment.findMany({ where: { commentMid: 1, commentRid: vod.vodId, commentStatus: 1 }, orderBy: { commentTime: "desc" }, take: 30 }),
     getSessionUser(),
     prisma.type.findUnique({ where: { typeId: vod.typeId } }),
+    prisma.collect.findMany({
+      where: { collectPlayerStatus: 1, NOT: { collectPlayerFile: "" } },
+      orderBy: { collectId: "asc" },
+      select: { collectPlayerName: true, collectPlayerFile: true, collectPlayerType: true, collectPlayerFrom: true },
+    }),
   ]);
   const user = session ? await prisma.user.findUnique({ where: { userId: session.uid } }) : null;
   const typeMap = new Map(types.map((t) => [t.typeId, t.typeName]));
+  const matchedPlayer = playerRows.find((p) => {
+    const codes = (p.collectPlayerFrom || "").split(",").map((v) => v.trim());
+    return codes.includes("*") || codes.includes(source.from);
+  });
+  const customPlayer = matchedPlayer?.collectPlayerFile
+    ? {
+        file: matchedPlayer.collectPlayerFile,
+        kind: (matchedPlayer.collectPlayerType === "js" ? "js" : "html") as "html" | "js",
+        name: matchedPlayer.collectPlayerName || undefined,
+      }
+    : undefined;
   const commentRows: CommentRow[] = comments.map((c) => ({
     commentId: c.commentId,
     commentName: c.commentName,
     commentTime: c.commentTime,
-    commentContent: c.commentContent,
+    commentContent: c.commentContent || "",
     commentUp: c.commentUp,
   }));
 
@@ -84,7 +100,7 @@ export default async function PlayPage({
             <div className="play_box play_video">
               <div className="left_row fl">
                 <div className="player_video embed-responsive embed-responsive-16by9 clearfix">
-                  <Player src={episode.url} poster={poster(vod.vodPic)} title={`${vod.vodName} ${episode.name}`} />
+                  <Player src={episode.url} poster={poster(vod.vodPic)} title={`${vod.vodName} ${episode.name}`} from={source.from} custom={customPlayer} />
                 </div>
                 <div className="play_but bline">
                   <ul>

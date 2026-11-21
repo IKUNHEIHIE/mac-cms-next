@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { assertAdmin } from "@/lib/adminAuth";
+import { safeFetch } from "@/lib/net";
 
 export const maxDuration = 300;
 
@@ -40,7 +41,7 @@ function extract(regex: string | null | undefined, html: string) {
 }
 
 async function fetchHtml(url: string) {
-  const res = await fetch(url, {
+  const res = await safeFetch(url, {
     headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml" },
     signal: AbortSignal.timeout(20000),
     cache: "no-store",
