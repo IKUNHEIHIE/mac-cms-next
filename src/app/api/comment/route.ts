@@ -5,6 +5,7 @@ import { currentUser } from "@/lib/user";
 import { ipToInt } from "@/lib/user";
 import { ipFromRequest } from "@/lib/extraSettings";
 import { isRateLimited, recordFailure } from "@/lib/rateLimit";
+import { bumpPublicCacheVersion } from "@/lib/redis";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
       commentContent: content.slice(0, 255),
     },
   });
+  await bumpPublicCacheVersion();
   return NextResponse.json({ code: 1, msg: "评论成功", comment });
 }
 

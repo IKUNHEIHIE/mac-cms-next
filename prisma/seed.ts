@@ -2,11 +2,13 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { defaultSettings } from "../src/lib/settings";
 import { importTypes, collectVods, LZ_API } from "../src/lib/collect";
+import { ensureVodSearchIndex, rebuildVodSearchIndex } from "../src/lib/searchIndex";
 
 const prisma = new PrismaClient();
 const now = () => Math.floor(Date.now() / 1000);
 
 async function main() {
+  await ensureVodSearchIndex();
   console.log("→ 导入资源站分类…");
   const { parents } = await importTypes(LZ_API);
   console.log("→ 采集影视数据（3 页）…");
@@ -257,7 +259,7 @@ async function main() {
       data: {
         collectName: "量子资源",
         collectUrl: LZ_API,
-        collectType: 1,
+        collectType: 2,
         collectMid: 1,
         collectFilter: 0,
         collectOpt: 0,
@@ -265,6 +267,7 @@ async function main() {
     });
   }
 
+  await rebuildVodSearchIndex();
   console.log("✓ 初始化完成：admin/admin123，demo/demo123");
 }
 

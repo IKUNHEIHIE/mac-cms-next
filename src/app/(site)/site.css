@@ -262,6 +262,9 @@ html,body{overflow-x:hidden;}
 .mc_qr{display:flex;flex-direction:column;align-items:center;gap:0.1rem;margin:0.3rem 0;color:#999;font-size:0.27rem;}
 .mc_qr img{border-radius:4px;}
 
+.content_btn .playbtn_info { clear: both; display: flex; align-items: center; gap: 0.2rem; padding-top: 0.12rem; color: #999; font-size: 0.3rem; line-height: 1.2; }
+.content_btn .playbtn_info a { color: #ff5f00; }
+
 /* 移动端适配 */
 @media (max-width: 820px) {
   body { padding-top: 2.5rem; }
@@ -292,20 +295,20 @@ html,body{overflow-x:hidden;}
   .content_detail.content_top { flex: 1 1 0; min-width: 0; }
   .content_detail.content_min { width: 100% !important; }
   .content_btn { padding: 0.05rem 0.25rem 0.15rem; }
-  .content_btn .playbtn { float: none; display: flex; flex-wrap: wrap; align-items: center; width: 100%; margin: 0; gap: 0.15rem; }
+  .content_btn .playbtn { float: left; width: 48%; margin: 0 4% 0 0; }
+  .content_btn .playbtn.o_down { margin-right: 0; }
   .content_btn .playbtn a {
-    width: auto;
+    width: 100%;
     height: 1rem;
     line-height: 1rem;
     padding: 0 0.2rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex: 1 1 38%;
+    font-size: 0.4rem;
+    border-radius: 32px;
   }
-  .content_btn .playbtn a.btn_play { flex: 1 1 55%; }
-  .content_btn .playbtn a.text_muted { flex: 1 1 35%; color: #ff5f00 !important; background: #fff; border-color: #ff5f00; }
-  .content_btn .playbtn span.text_muted { flex: 0 0 auto; color: #999; font-size: 0.3rem; }
+  .content_btn .playbtn_info { clear: both; padding-top: 0.15rem; }
   .play_but ul li > span.btns_disad { display: none !important; }
   .mc_form_row { flex-direction: column; align-items: stretch; gap: 0.08rem; }
   .mc_form_row label { width: auto; text-align: left; }

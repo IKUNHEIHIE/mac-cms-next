@@ -28,3 +28,10 @@ export function findActiveGroupKey(pathname: string): string | null {
   }
   return null;
 }
+
+export function findActiveSection(pathname: string): string | null {
+  const section = NAV_DATA.find((entry) =>
+    entry.items.some((item) => item.url && isPathActive(item.url, pathname)),
+  );
+  return section?.label ?? null;
+}

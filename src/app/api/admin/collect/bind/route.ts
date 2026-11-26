@@ -9,9 +9,11 @@ export async function GET(request: Request) {
   if (!(await assertAdmin())) return NextResponse.json({ code: 0, msg: "未登录" }, { status: 401 });
   const url = new URL(request.url);
   const api = (url.searchParams.get("api") || LZ_API).trim();
+  const rawFormat = String(url.searchParams.get("format") || "");
+  const format = ["auto", "json", "xml"].includes(rawFormat) ? (rawFormat as "auto" | "json" | "xml") : "auto";
   try {
     const [remoteTypes, localTypes, bindings] = await Promise.all([
-      fetchRemoteTypes(api),
+      fetchRemoteTypes(api, format),
       prisma.type.findMany({ orderBy: { typeSort: "asc" }, select: { typeId: true, typeName: true, typePid: true, typeMid: true } }),
       getCollectBindings(api),
     ]);

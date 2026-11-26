@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { open } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/lib/db";
@@ -18,9 +19,9 @@ const STATUS: Record<string, string> = {
   idle: "未开始",
 };
 
-async function tailLog(lines = 12) {
+async function tailLog(lines = 12, fileName = "collect-all.log") {
   try {
-    const file = path.join(process.cwd(), "_logs", "collect-all.log");
+    const file = path.join(process.cwd(), "_logs", fileName);
     const fh = await open(file, "r");
     const stat = await fh.stat();
     const start = Math.max(0, stat.size - 12000);
@@ -33,13 +34,35 @@ async function tailLog(lines = 12) {
   }
 }
 
-export default async function CollectAllPage() {
-  const [stateRaw, vodCount, typeCount, logTail] = await Promise.all([
-    getCollectState(),
+export default async function CollectAllPage({ searchParams }: { searchParams: Promise<{ nodeId?: string }> }) {
+  const sp = await searchParams;
+  const nodeId = Number(sp.nodeId) || undefined;
+  const [stateRaw, vodCount, typeCount, logTail, node, collectNodes, nodeStateRows] = await Promise.all([
+    getCollectState(nodeId),
     prisma.vod.count(),
     prisma.type.count(),
-    tailLog(),
+    tailLog(12, nodeId ? `collect-all-node-${nodeId}.log` : "collect-all.log"),
+    nodeId ? prisma.collect.findUnique({ where: { collectId: nodeId } }) : null,
+    prisma.collect.findMany({ orderBy: { collectId: "asc" }, select: { collectId: true, collectName: true } }),
+    prisma.setting.findMany({
+      where: { key: { startsWith: "collect_all_state_node_" } },
+      select: { key: true, value: true },
+    }),
   ]);
+  const activeNodes = nodeStateRows
+    .map((row) => {
+      const id = Number(row.key.slice("collect_all_state_node_".length));
+      try {
+        const st = JSON.parse(row.value) as { status?: string; pid?: number; pagesDone?: number; pagecount?: number };
+        if (!(st.status === "running" || st.status === "paused" || isPidAlive(st.pid))) return null;
+        const info = collectNodes.find((item) => item.collectId === id);
+        return { id, name: info?.collectName || `节点#${id}`, done: st.pagesDone || 0, pages: st.pagecount || 0 };
+      } catch {
+        return null;
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
+  if (!nodeId && activeNodes.length === 1) redirect(`/admin/collect-all?nodeId=${activeNodes[0].id}`);
   const state = stateRaw || {};
   const running = isPidAlive(state.pid);
   const status = running ? "running" : state.status === "running" ? "paused" : state.status || "idle";
@@ -52,17 +75,36 @@ export default async function CollectAllPage() {
 
   return (
     <div className="space-y-5">
-      <AutoRefresh seconds={15} />
+      <AutoRefresh seconds={5} />
+      {activeNodes.length > 1 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm text-blue-700">
+          <strong>正在采集：</strong>
+          {activeNodes.map((item) => (
+            <Link key={item.id} href={`/admin/collect-all?nodeId=${item.id}`} className="rounded-md bg-white/70 px-2 py-1 font-medium">
+              {item.name}（{item.done}/{item.pages} 页）
+            </Link>
+          ))}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-text-primary">量子资源站 · 全量采集</h1>
+          <h1 className="text-xl font-bold text-text-primary">{node?.collectName || "量子资源站"} · 全量采集</h1>
           <p className="mt-1 text-sm text-text-tertiary">
-            数据源 lzizy.net，按页抓取（每页 20 条），单线程自适应限速并断点续采。当前影片 {vodCount} 部 / 分类 {typeCount} 个。
+            数据源 {node?.collectUrl || "lzizy.net"}，按页抓取（每页 20 条），单线程自适应限速并断点续采。当前影片 {vodCount} 部 / 分类 {typeCount} 个。
           </p>
         </div>
-        <Link href="/admin/collect" className="h-9 rounded-lg border border-card-border px-4 text-sm leading-9 text-text-secondary hover:bg-background-gray-primary">
-          返回资源采集
-        </Link>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-text-tertiary">采集节点：</span>
+          <Link href="/admin/collect-all" className={`rounded-md px-2 py-1 ${!nodeId ? "bg-primary-500 text-white" : "text-primary-500"}`}>量子资源</Link>
+          {collectNodes.filter((item) => item.collectId !== 1).map((item) => (
+            <Link key={item.collectId} href={`/admin/collect-all?nodeId=${item.collectId}`} className={`rounded-md px-2 py-1 ${nodeId === item.collectId ? "bg-primary-500 text-white" : "text-primary-500"}`}>
+              {item.collectName}
+            </Link>
+          ))}
+          <Link href={nodeId ? "/admin/manage/collect" : "/admin/collect"} className="ml-2 h-9 rounded-lg border border-card-border px-4 leading-9 text-text-secondary hover:bg-background-gray-primary">
+            {nodeId ? "返回采集节点" : "返回添加采集节点"}
+          </Link>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-card-border bg-card-surface-area p-5">
@@ -83,7 +125,7 @@ export default async function CollectAllPage() {
             {running && state.pid ? ` · PID ${state.pid}` : ""}
           </span>
         </div>
-        <CollectControls running={running} status={state.status || ""} pid={state.pid} />
+        <CollectControls running={running} status={state.status || ""} pid={state.pid} nodeId={nodeId} />
         <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-background-gray-primary">
           <div className="h-full rounded-full bg-primary-500 transition-all" style={{ width: `${pct}%` }} />
         </div>

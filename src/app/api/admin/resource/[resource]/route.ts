@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { assertAdmin } from "@/lib/adminAuth";
 import { getResource, defaultOrder, type ResourceDef } from "@/lib/adminResources";
+import { removeVodSearchIds, syncVodSearchIds } from "@/lib/searchIndex";
+import { CACHE_KEYS, bumpPublicCacheVersion, cacheDel } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +96,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ res
   const data = await buildData(def, body, true);
   try {
     const row = await delegate(def.model).create({ data });
+    if (def.key === "vod") await syncVodSearchIds([Number(row[def.idField])]).catch(() => {});
+    await bumpPublicCacheVersion();
+    if (def.key === "type") await cacheDel(CACHE_KEYS.navTypes);
     return NextResponse.json({ code: 1, msg: "创建成功", row });
   } catch (e) {
     return NextResponse.json({ code: 0, msg: e instanceof Error ? e.message : "创建失败" }, { status: 400 });
@@ -111,6 +116,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ reso
   const data = await buildData(def, body, false);
   try {
     const row = await delegate(def.model).update({ where: { [def.idField]: id }, data });
+    if (def.key === "vod") await syncVodSearchIds([id]).catch(() => {});
+    await bumpPublicCacheVersion();
+    if (def.key === "type") await cacheDel(CACHE_KEYS.navTypes);
     return NextResponse.json({ code: 1, msg: "保存成功", row });
   } catch (e) {
     return NextResponse.json({ code: 0, msg: e instanceof Error ? e.message : "保存失败" }, { status: 400 });
@@ -134,6 +142,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ r
       }
     }
     await delegate(def.model).delete({ where: { [def.idField]: id } });
+    if (def.key === "vod") await removeVodSearchIds([id]).catch(() => {});
+    await bumpPublicCacheVersion();
+    if (def.key === "type") await cacheDel(CACHE_KEYS.navTypes);
     return NextResponse.json({ code: 1, msg: "已删除" });
   } catch (e) {
     return NextResponse.json({ code: 0, msg: e instanceof Error ? e.message : "删除失败" }, { status: 400 });

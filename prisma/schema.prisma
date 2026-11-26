@@ -590,6 +590,18 @@ model Vod {
   @@index([vodTime])
   @@index([vodHits])
   @@index([vodLevel])
+  @@index([vodStatus, vodTime], map: "mac_vod_status_time_idx")
+  @@index([vodStatus, vodHits, vodTime], map: "mac_vod_status_hits_time_idx")
+  @@index([vodStatus, vodHitsDay, vodTime], map: "mac_vod_status_hits_day_idx")
+  @@index([vodStatus, vodHitsWeek, vodTime], map: "mac_vod_status_week_time_idx")
+  @@index([vodStatus, vodHitsMonth, vodTime], map: "mac_vod_status_hits_month_idx")
+  @@index([vodStatus, vodLevel, vodTime], map: "mac_vod_status_level_time_idx")
+  @@index([vodStatus, typeId1, vodTime], map: "mac_vod_status_type1_time_idx")
+  @@index([vodStatus, typeId1, vodHits], map: "mac_vod_status_type1_hits_idx")
+  @@index([vodStatus, typeId1, vodScore], map: "mac_vod_status_type1_score_idx")
+  @@index([vodStatus, typeId, vodTime], map: "mac_vod_status_type_time_idx")
+  @@index([vodStatus, typeId, vodHits], map: "mac_vod_status_type_hits_idx")
+  @@index([vodStatus, typeId, vodScore], map: "mac_vod_status_type_score_idx")
   @@map("mac_vod")
 }
 

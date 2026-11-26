@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import VodCard from "@/components/site/VodCard";
 import { getSiteContext } from "@/lib/site";
 import { poster } from "@/lib/maccms";
+import { vodCardSelect } from "@/lib/vodQuery";
+import { searchActorVodIds } from "@/lib/searchIndex";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +20,15 @@ export default async function ActorDetailPage({ params }: { params: Promise<{ id
   const actor = await prisma.actor.findUnique({ where: { actorId: Number(id) } });
   if (!actor) notFound();
   const { settings } = await getSiteContext();
-  const works = await prisma.vod.findMany({
-    where: { vodActor: { contains: actor.actorName } },
-    orderBy: { vodTime: "desc" },
-    take: 24,
-  });
+  const workIds = await searchActorVodIds(actor.actorName, 24);
+  const workRows = workIds.length
+    ? await prisma.vod.findMany({
+        where: { vodId: { in: workIds }, vodStatus: 1 },
+        select: vodCardSelect(settings.theme.playlink),
+      })
+    : [];
+  const workMap = new Map(workRows.map((v) => [v.vodId, v]));
+  const works = workIds.map((id) => workMap.get(id)).filter((v): v is NonNullable<typeof v> => Boolean(v));
   const roles = await prisma.role.findMany({ where: { roleRid: actor.actorId }, take: 20 });
 
   return (

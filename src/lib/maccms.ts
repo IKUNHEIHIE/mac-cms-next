@@ -35,6 +35,8 @@ const PLAYER_LABELS: Record<string, string> = {
   snm3u8: "索尼资源",
   hnm3u8: "红牛线路",
   zuidam3u8: "最大资源",
+  subyun: "速播云播",
+  subm3u8: "速播线路",
 };
 
 export function playerLabel(from: string, labels?: Record<string, string>) {

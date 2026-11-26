@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export default function AdminLoginForm() {
+export default function AdminLoginForm({ adminPath = "/admin" }: { adminPath?: string }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [pwd, setPwd] = useState("");
@@ -22,7 +22,7 @@ export default function AdminLoginForm() {
       });
       const data = await res.json();
       if (!res.ok || data.code === 0) throw new Error(data.msg || "登录失败");
-      router.push("/admin");
+      router.push(adminPath);
       router.refresh();
     } catch (err) {
       setMsg(err instanceof Error ? err.message : "登录失败");

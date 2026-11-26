@@ -1,12 +1,13 @@
 import Link from "next/link";
-import VodCard from "@/components/site/VodCard";
+import VodCard, { type VodCardData } from "@/components/site/VodCard";
 import Pagination from "@/components/site/Pagination";
 import RankList from "@/components/site/RankList";
 import AdSlot from "@/components/site/AdSlot";
 import { prisma } from "@/lib/db";
 import { getSiteContext, pageParam } from "@/lib/site";
 import { vodPlayLink } from "@/lib/maccms";
-import type { Prisma } from "@prisma/client";
+import { searchVodIds } from "@/lib/searchIndex";
+import { VOD_RANK_SELECT, vodCardSelect } from "@/lib/vodQuery";
 
 export const dynamic = "force-dynamic";
 
@@ -25,30 +26,47 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const { settings } = await getSiteContext();
   const theme = settings.theme;
 
-  const where: Prisma.VodWhereInput = { vodStatus: 1 };
-  if (wd) {
-    where.OR = [
-      { vodName: { contains: wd } },
-      { vodActor: { contains: wd } },
-      { vodDirector: { contains: wd } },
-      { vodBlurb: { contains: wd } },
-    ];
-  }
-  if (sp.class) where.vodClass = { contains: sp.class };
-  if (sp.area) where.vodArea = { contains: sp.area };
-  if (sp.year) where.vodYear = sp.year;
+  const queried = Boolean(wd || sp.class || sp.area || sp.year);
+  const select = vodCardSelect(theme.playlink);
 
-  const [total, list, rank, types] = await Promise.all([
-    wd || sp.class || sp.area || sp.year ? prisma.vod.count({ where }) : Promise.resolve(0),
-    wd || sp.class || sp.area || sp.year
-      ? prisma.vod.findMany({ where, orderBy: { vodTime: "desc" }, skip: (page - 1) * size, take: size })
-      : prisma.vod.findMany({ where: { vodStatus: 1 }, orderBy: { vodTime: "desc" }, take: 18 }),
-    prisma.vod.findMany({ orderBy: { vodHitsWeek: "desc" }, take: 10 }),
+  let list: VodCardData[] = [];
+  let total = 0;
+
+  if (queried) {
+    const found = await searchVodIds({
+      wd,
+      klass: sp.class,
+      area: sp.area,
+      year: sp.year,
+      skip: (page - 1) * size,
+      take: size,
+    });
+    total = found.total;
+    if (found.ids.length) {
+      const rows = await prisma.vod.findMany({ where: { vodId: { in: found.ids } }, select });
+      const byId = new Map(rows.map((v) => [v.vodId, v]));
+      list = found.ids.map((id) => byId.get(id)).filter((v): v is NonNullable<typeof v> => Boolean(v)) as VodCardData[];
+    }
+  } else {
+    list = (await prisma.vod.findMany({
+      where: { vodStatus: 1 },
+      orderBy: { vodTime: "desc" },
+      take: 18,
+      select,
+    })) as VodCardData[];
+  }
+
+  const [rank, types] = await Promise.all([
+    prisma.vod.findMany({
+      where: { vodStatus: 1 },
+      orderBy: { vodHitsWeek: "desc" },
+      take: 10,
+      select: VOD_RANK_SELECT,
+    }),
     prisma.type.findMany({ select: { typeId: true, typeName: true } }),
   ]);
   const typeMap = new Map(types.map((t) => [t.typeId, t.typeName]));
   const pageCount = Math.max(1, Math.ceil(total / size));
-  const queried = Boolean(wd || sp.class || sp.area || sp.year);
 
   return (
     <div className="container">

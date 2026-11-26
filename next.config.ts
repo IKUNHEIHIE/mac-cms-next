@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'" },
         ],
       },
+      {
+        source: "/theme/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=604800, immutable" }],
+      },
     ];
   },
   async rewrites() {

@@ -1,7 +1,18 @@
 import { prisma } from "../src/lib/db";
-import { mapLzVod, importTypes, LZ_API, getCollectBindings } from "../src/lib/collect";
+import { mapLzVod, importTypes, LZ_API, getCollectBindings, sourceIdOffset } from "../src/lib/collect";
+import { parseXmlResponse } from "../src/lib/xmlCollect";
+import { rebuildVodSearchIndex } from "../src/lib/searchIndex";
+import { bumpPublicCacheVersion } from "../src/lib/redis";
 
-const STATE_KEY = "collect_all_state";
+const argv = process.argv.slice(2);
+const argValue = (name: string, fallback = "") => {
+  const index = argv.indexOf(name);
+  return index >= 0 && argv[index + 1] ? argv[index + 1] : fallback;
+};
+const API = argValue("--api", LZ_API) || LZ_API;
+const FORMAT = argValue("--format", "auto");
+const STATE_KEY = argValue("--state-key", "collect_all_state") || "collect_all_state";
+const NODE_ID = Number(argValue("--node-id", "0")) || 0;
 const MIN_INTERVAL = 1200;
 const START_INTERVAL = 2000;
 const MAX_INTERVAL = 8000;
@@ -75,15 +86,20 @@ type LzVod = Record<string, string | number | undefined>;
 
 async function fetchPage(page: number): Promise<{ list: LzVod[]; pagecount: number; total: number }> {
   let lastErr = "";
+  const pageUrl = new URL(API);
+  pageUrl.searchParams.set("ac", "detail");
+  pageUrl.searchParams.set("pg", String(page));
+  if (FORMAT === "xml") pageUrl.searchParams.set("at", "xml");
+  else if (FORMAT === "json") pageUrl.searchParams.delete("at");
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     await waitSpacing();
     try {
-      const res = await fetch(`${LZ_API}?ac=detail&pg=${page}`, {
+      const res = await fetch(pageUrl.toString(), {
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
-          Accept: "application/json,text/plain,*/*",
-          Referer: "https://lzizy.net/",
+          Accept: "application/json,text/xml,application/xml,text/plain,*/*",
+          Referer: new URL(API).origin,
         },
         signal: AbortSignal.timeout(35000),
       });
@@ -99,7 +115,14 @@ async function fetchPage(page: number): Promise<{ list: LzVod[]; pagecount: numb
       }
       if (res.status === 403 || res.status >= 500) throw new Error(`HTTP ${res.status}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as { code?: number; list?: LzVod[]; pagecount?: number; total?: number };
+      const text = await res.text();
+      let data: { code?: number; list?: LzVod[]; pagecount?: number; total?: number };
+      if (FORMAT === "xml" || (FORMAT === "auto" && text.trimStart().startsWith("<"))) {
+        const parsed = parseXmlResponse(text);
+        data = { code: parsed.code, list: parsed.list, pagecount: parsed.pagecount, total: parsed.total };
+      } else {
+        data = JSON.parse(text) as typeof data;
+      }
       if (data.code !== 1 || !Array.isArray(data.list)) throw new Error("返回数据无效");
       consecutive429 = 0;
       successes++;
@@ -120,11 +143,11 @@ async function fetchPage(page: number): Promise<{ list: LzVod[]; pagecount: numb
   throw new Error(`page ${page}: ${lastErr}`);
 }
 
-async function insertPage(list: LzVod[], parent: Record<number, number>, bindings: Record<number, number>) {
+async function insertPage(list: LzVod[], parent: Record<number, number>, bindings: Record<number, number>, idOffset: number) {
   const rows = list
     .map((v) => {
       try {
-        return mapLzVod(v, parent, { bindings });
+        return mapLzVod(v, parent, { bindings, idOffset });
       } catch {
         return null;
       }
@@ -148,12 +171,15 @@ async function insertPage(list: LzVod[], parent: Record<number, number>, binding
 }
 
 async function main() {
-  log("启动全量采集（单线程自适应限速）…");
-  await importTypes(LZ_API);
+  log(`启动全量采集（${NODE_ID ? `节点#${NODE_ID} ` : ""}${API}，格式 ${FORMAT}，单线程自适应限速）…`);
+  if (API.replace(/\/+$/, "") === LZ_API.replace(/\/+$/, "")) {
+    await importTypes(API, FORMAT as "auto" | "json" | "xml");
+  }
   const types = await prisma.type.findMany({ select: { typeId: true, typePid: true } });
   const parent: Record<number, number> = {};
   for (const t of types) parent[t.typeId] = t.typePid;
-  const bindings = await getCollectBindings(LZ_API);
+  const bindings = await getCollectBindings(API);
+  const idOffset = sourceIdOffset(API);
 
   const before = await prisma.vod.count();
   const prev = await loadState();
@@ -206,7 +232,7 @@ async function main() {
   while (page <= state.pagecount && !stopping) {
     try {
       const data = await fetchPage(page);
-      const ins = await insertPage(data.list, parent, bindings);
+      const ins = await insertPage(data.list, parent, bindings, idOffset);
       state.imported += ins.created;
       state.skipped += ins.dup;
       state.pagesDone++;
@@ -237,7 +263,7 @@ async function main() {
       if (stopping) break;
       try {
         const data = await fetchPage(p);
-        const ins = await insertPage(data.list, parent, bindings);
+        const ins = await insertPage(data.list, parent, bindings, idOffset);
         state.imported += ins.created;
         state.skipped += ins.dup;
         state.pagesDone++;
@@ -258,6 +284,8 @@ async function main() {
     `采集结束：入库 ${state.imported}，重复 ${state.skipped}，失败页 ${state.failedPages.length}，影片总数 ${before} → ${after}，用时约 ${elapsed} 分钟`,
   );
   if (state.failedPages.length) log(`失败页：${state.failedPages.slice(0, 100).join(",")}`);
+  await rebuildVodSearchIndex().catch((e) => log(`搜索索引重建失败：${String(e).slice(0, 200)}`));
+  await bumpPublicCacheVersion();
   await prisma.$disconnect();
 }
 

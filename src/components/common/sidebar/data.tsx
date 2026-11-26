@@ -69,7 +69,7 @@ export const NAV_DATA: NavSection[] = [
   {
     label: "采集与系统",
     items: [
-      { title: "资源采集", url: "/admin/collect", icon: <TaskIcon />, items: [] },
+      { title: "添加采集节点", url: "/admin/collect", icon: <TaskIcon />, items: [] },
             { title: "全量采集", url: "/admin/collect-all", icon: <PieChartIcon />, items: [] },
       { title: "采集节点", url: "/admin/manage/collect", icon: <TaskIcon />, items: [] },
       { title: "文章采集", url: "/admin/cjrun", icon: <TaskIcon />, items: [] },

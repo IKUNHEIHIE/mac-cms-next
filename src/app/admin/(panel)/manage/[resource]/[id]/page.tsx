@@ -55,7 +55,13 @@ export default async function ResourceEditPage({
             </p>
           </div>
           {String(row.collectUrl || "").trim() ? (
-            <CollectBindForm initialApi={String(row.collectUrl)} localTypes={localTypes} lockApi autoLoad />
+            <CollectBindForm
+              initialApi={String(row.collectUrl)}
+              localTypes={localTypes}
+              lockApi
+              autoLoad
+              format={Number(row.collectType) === 1 ? "xml" : Number(row.collectType) === 2 ? "json" : "auto"}
+            />
           ) : (
             <p className="text-sm text-text-tertiary">请先保存资源站接口地址，再配置分类绑定。</p>
           )}

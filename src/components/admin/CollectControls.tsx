@@ -7,10 +7,12 @@ export default function CollectControls({
   running,
   status,
   pid,
+  nodeId,
 }: {
   running: boolean;
   status: string;
   pid?: number;
+  nodeId?: number;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
@@ -24,7 +26,7 @@ export default function CollectControls({
       const res = await fetch("/api/admin/collect-all", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, nodeId }),
       });
       const data = await res.json();
       if (!res.ok || data.code === 0) throw new Error(data.msg || "操作失败");

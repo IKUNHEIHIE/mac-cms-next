@@ -1,5 +1,7 @@
+import { cache } from "react";
 import { prisma } from "./db";
 import { getSettings, type Settings } from "./settings";
+import { CACHE_KEYS, cacheGet, cacheSet } from "./redis";
 
 export type SiteType = {
   typeId: number;
@@ -10,22 +12,28 @@ export type SiteType = {
   typeExtend: string | null;
 };
 
-export async function getSiteContext(): Promise<{
+async function loadSiteContext(): Promise<{
   settings: Settings;
   types: SiteType[];
   navTypes: SiteType[];
 }> {
   const settings = await getSettings();
-  const types = await prisma.type.findMany({
-    where: { typeStatus: 1, typeMid: 1, typePid: 0 },
-    orderBy: { typeSort: "asc" },
-    select: { typeId: true, typeName: true, typeEn: true, typePid: true, typeMid: true, typeExtend: true },
-  });
+  let types = await cacheGet<SiteType[]>(CACHE_KEYS.navTypes);
+  if (!types) {
+    types = await prisma.type.findMany({
+      where: { typeStatus: 1, typeMid: 1, typePid: 0 },
+      orderBy: { typeSort: "asc" },
+      select: { typeId: true, typeName: true, typeEn: true, typePid: true, typeMid: true, typeExtend: true },
+    });
+    await cacheSet(CACHE_KEYS.navTypes, types, 3600);
+  }
   const ids = settings.theme.navIds || [];
   const picked = ids.length ? ids.map((id) => types.find((t) => t.typeId === id)).filter(Boolean) : [];
   const navTypes = (picked.length ? picked : types.slice(0, 7)) as SiteType[];
   return { settings, types, navTypes };
 }
+
+export const getSiteContext = cache(loadSiteContext);
 
 export function typeFilters(typeExtend: string | null): { class: string[]; area: string[]; year: string[]; lang: string[] } {
   try {

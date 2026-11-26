@@ -1,4 +1,7 @@
+import { cache } from "react";
 import { prisma } from "./db";
+import { CACHE_KEYS, bumpPublicCacheVersion, cacheDel, cacheGet, cacheSet } from "./redis";
+import { ADMIN_PATH_DEFAULT, normalizeAdminPath } from "./adminPath";
 
 export type SiteConfig = {
   site_name: string;
@@ -16,6 +19,7 @@ export type SiteConfig = {
   user_status: number;
   copyright_status: number;
   copyright_notice: string;
+  adminPath: string;
 };
 
 export type ThemeConfig = {
@@ -62,6 +66,7 @@ export const defaultSettings: Settings = {
     user_status: 1,
     copyright_status: 0,
     copyright_notice: "该视频由于版权限制，暂不提供播放。",
+    adminPath: ADMIN_PATH_DEFAULT,
   },
   theme: {
     name: "conch",
@@ -93,25 +98,46 @@ function merge<T extends object>(base: T, patch: Partial<T> | undefined): T {
   return { ...base, ...(patch || {}) };
 }
 
-export async function getSettings(): Promise<Settings> {
+async function loadSettings(): Promise<Settings> {
+  const cached = await cacheGet<Settings>(CACHE_KEYS.settings);
+  if (cached?.site && cached.theme) {
+    const result = { site: merge(defaultSettings.site, cached.site), theme: merge(defaultSettings.theme, cached.theme) };
+    result.site.adminPath = normalizeAdminPath(result.site.adminPath);
+    return result;
+  }
   try {
     const rows = await prisma.setting.findMany();
     const map = new Map(rows.map((r) => [r.key, r.value]));
     const site = map.get("site") ? JSON.parse(map.get("site")!) : undefined;
     const theme = map.get("theme") ? JSON.parse(map.get("theme")!) : undefined;
-    return { site: merge(defaultSettings.site, site), theme: merge(defaultSettings.theme, theme) };
+    const result = { site: merge(defaultSettings.site, site), theme: merge(defaultSettings.theme, theme) };
+    result.site.adminPath = normalizeAdminPath(result.site.adminPath);
+    await Promise.all([
+      cacheSet(CACHE_KEYS.settings, result, 3600),
+      cacheSet(CACHE_KEYS.adminPath, result.site.adminPath, 31536000),
+    ]);
+    return result;
   } catch {
     return defaultSettings;
   }
 }
 
+export const getSettings = cache(loadSettings);
+
 export async function saveSetting(key: "site" | "theme", value: Record<string, unknown>) {
   const current = await getSettings();
   const next = merge(key === "site" ? current.site : current.theme, value as never);
+  if (key === "site") (next as SiteConfig).adminPath = normalizeAdminPath((next as SiteConfig).adminPath);
+  const adminPath = key === "site" ? (next as SiteConfig).adminPath : current.site.adminPath;
   await prisma.setting.upsert({
     where: { key },
     update: { value: JSON.stringify(next) },
     create: { key, value: JSON.stringify(next) },
   });
+  await Promise.all([
+    cacheDel(CACHE_KEYS.settings, CACHE_KEYS.navTypes),
+    cacheSet(CACHE_KEYS.adminPath, adminPath, 31536000),
+    bumpPublicCacheVersion(),
+  ]);
   return next;
 }

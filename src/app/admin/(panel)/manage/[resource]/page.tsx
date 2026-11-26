@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getResource, defaultOrder } from "@/lib/adminResources";
 import { fmtTime } from "@/lib/maccms";
 import DeleteButton from "@/components/admin/DeleteButton";
+import CollectNodeActions from "@/components/admin/CollectNodeActions";
 
 export const dynamic = "force-dynamic";
 
@@ -134,6 +135,13 @@ export default async function ResourceListPage({
                     </td>
                   ))}
                   <td className="whitespace-nowrap px-4 py-3 text-right">
+                    {def.key === "collect" ? (
+                      <CollectNodeActions
+                        nodeId={Number(row.collectId)}
+                        nodeName={String(row.collectName || "")}
+                        format={Number(row.collectType) === 1 ? "xml" : Number(row.collectType) === 2 ? "json" : "auto"}
+                      />
+                    ) : null}
                     <Link
                       href={`/admin/manage/${def.key}/${row[def.idField]}`}
                       className="mr-1 rounded-md px-2 py-1 text-xs text-primary-500 hover:bg-background-gray-primary"

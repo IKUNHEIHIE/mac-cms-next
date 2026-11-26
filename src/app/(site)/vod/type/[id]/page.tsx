@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { getSiteContext, typeFilters, pageParam } from "@/lib/site";
 import type { Prisma } from "@prisma/client";
 import { typeSeoFor } from "@/lib/typeSeo";
+import { VOD_TOP_SELECT, typeVodWhere, vodCardSelect } from "@/lib/vodQuery";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,7 @@ export default async function TypePage({
   const children = await prisma.type.findMany({
     where: { typePid: typeId, typeStatus: 1 },
     orderBy: { typeSort: "asc" },
+    select: { typeId: true, typeName: true },
   });
   const seo = typeSeoFor(type.typeId, type.typeName);
   const intro = type.typeDes || seo.description;
@@ -53,10 +55,8 @@ export default async function TypePage({
   const orderBy: Prisma.VodOrderByWithRelationInput =
     by === "hits" ? { vodHits: "desc" } : by === "score" ? { vodScore: "desc" } : { vodTime: "desc" };
 
-  const where: Prisma.VodWhereInput = {
-    vodStatus: 1,
-    OR: [{ typeId: typeId }, { typeId1: typeId }, ...(children.length ? [{ typeId: { in: children.map((c) => c.typeId) } }] : [])],
-  };
+  const isParent = type.typePid === 0;
+  const where: Prisma.VodWhereInput = typeVodWhere(typeId, isParent);
   if (sp.class) where.vodClass = { contains: sp.class };
   if (sp.area) where.vodArea = { contains: sp.area };
   if (sp.year) where.vodYear = sp.year;
@@ -64,8 +64,19 @@ export default async function TypePage({
 
   const [total, list, top] = await Promise.all([
     prisma.vod.count({ where }),
-    prisma.vod.findMany({ where, orderBy, skip: (page - 1) * size, take: size }),
-    prisma.vod.findMany({ where: { OR: [{ typeId }, { typeId1: typeId }] }, orderBy: { vodHits: "desc" }, take: 3 }),
+    prisma.vod.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * size,
+      take: size,
+      select: vodCardSelect(theme.playlink),
+    }),
+    prisma.vod.findMany({
+      where: typeVodWhere(typeId, isParent),
+      orderBy: { vodHits: "desc" },
+      take: 3,
+      select: VOD_TOP_SELECT,
+    }),
   ]);
   const pageCount = Math.max(1, Math.ceil(total / size));
 

@@ -5,37 +5,51 @@ import AdSlot from "@/components/site/AdSlot";
 import { prisma } from "@/lib/db";
 import { getSiteContext } from "@/lib/site";
 import { poster, vodLink } from "@/lib/maccms";
+import { VOD_BANNER_SELECT, vodCardSelect } from "@/lib/vodQuery";
 
 export default async function HomePage() {
   const { settings, types } = await getSiteContext();
   const theme = settings.theme;
   const homeTypeIds = theme.categoryHomeIds?.length ? theme.categoryHomeIds : types.slice(0, 4).map((t) => t.typeId);
 
-  const children = await prisma.type.findMany({
-    where: { typePid: { in: homeTypeIds } },
-    select: { typeId: true, typePid: true },
-  });
-
   const [bannerVods, hot, sections, arts, links, topicList] = await Promise.all([
-    prisma.vod.findMany({ where: { vodLevel: 9 }, orderBy: { vodTime: "desc" }, take: 6 }),
-    prisma.vod.findMany({ orderBy: [{ vodHits: "desc" }, { vodTime: "desc" }], take: theme.hotNum || 12 }),
+    prisma.vod.findMany({
+      where: { vodStatus: 1, vodLevel: 9 },
+      orderBy: { vodTime: "desc" },
+      take: 6,
+      select: VOD_BANNER_SELECT,
+    }),
+    prisma.vod.findMany({
+      where: { vodStatus: 1 },
+      orderBy: [{ vodHits: "desc" }, { vodTime: "desc" }],
+      take: theme.hotNum || 12,
+      select: vodCardSelect(theme.playlink),
+    }),
     Promise.all(
       homeTypeIds.slice(0, 4).map(async (id) => {
         const type = types.find((t) => t.typeId === id);
-        const childIds = children.filter((c) => c.typePid === id).map((c) => c.typeId);
         const list = await prisma.vod.findMany({
-          where: {
-            OR: [{ typeId: id }, { typeId1: id }, ...(childIds.length ? [{ typeId: { in: childIds } }] : [])],
-          },
+          where: { vodStatus: 1, typeId1: id },
           orderBy: { vodTime: "desc" },
           take: theme.homeNum || 12,
+          select: vodCardSelect(theme.playlink),
         });
         return { type, list };
       }),
     ),
-    prisma.art.findMany({ where: { artStatus: 1 }, orderBy: { artTime: "desc" }, take: 4 }),
-    prisma.link.findMany({ orderBy: { linkSort: "asc" }, take: 8 }),
-    prisma.topic.findMany({ where: { topicStatus: 1 }, orderBy: { topicSort: "asc" }, take: 3 }),
+    prisma.art.findMany({
+      where: { artStatus: 1 },
+      orderBy: { artTime: "desc" },
+      take: 4,
+      select: { artId: true, artName: true, artPic: true, artBlurb: true },
+    }),
+    prisma.link.findMany({ orderBy: { linkSort: "asc" }, take: 8, select: { linkId: true, linkName: true, linkUrl: true } }),
+    prisma.topic.findMany({
+      where: { topicStatus: 1 },
+      orderBy: { topicSort: "asc" },
+      take: 3,
+      select: { topicId: true, topicName: true, topicPic: true, topicPicSlide: true, topicBlurb: true, topicRemarks: true },
+    }),
   ]);
 
   const bannerRaw: BannerItem[] = [

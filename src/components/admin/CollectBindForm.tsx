@@ -11,11 +11,13 @@ export default function CollectBindForm({
   localTypes,
   lockApi = false,
   autoLoad = false,
+  format = "auto",
 }: {
   initialApi: string;
   localTypes: LocalType[];
   lockApi?: boolean;
   autoLoad?: boolean;
+  format?: "auto" | "json" | "xml";
 }) {
   const [api, setApi] = useState(initialApi);
   const [remoteTypes, setRemoteTypes] = useState<RemoteType[]>([]);
@@ -34,7 +36,6 @@ export default function CollectBindForm({
     return out;
   }, [localTypes]);
 
-  const localIdSet = useMemo(() => new Set(localTypes.map((t) => t.typeId)), [localTypes]);
   const remoteParents = useMemo(() => remoteTypes.filter((t) => !t.type_pid), [remoteTypes]);
   const remoteChildren = useMemo(
     () => remoteTypes.filter((t) => t.type_pid).reduce<Record<number, RemoteType[]>>((acc, t) => {
@@ -48,7 +49,7 @@ export default function CollectBindForm({
     setBusy("load");
     setMsg("");
     try {
-      const res = await fetch(`/api/admin/collect/bind?api=${encodeURIComponent(api)}`, { cache: "no-store" });
+      const res = await fetch(`/api/admin/collect/bind?api=${encodeURIComponent(api)}&format=${format}`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok || data.code === 0) throw new Error(data.msg || "加载失败");
       setRemoteTypes(data.remoteTypes || []);
@@ -69,13 +70,26 @@ export default function CollectBindForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function autoMatch() {
-    const next = { ...bindings };
-    for (const r of remoteTypes) {
-      if (localIdSet.has(r.type_id)) next[String(r.type_id)] = String(r.type_id);
+  async function autoMatch() {
+    setBusy("auto");
+    setMsg("");
+    try {
+      const res = await fetch("/api/admin/collect/bind/auto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api, format }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.code === 0) throw new Error(data.msg || "智能绑定失败");
+      const next: Record<string, string> = {};
+      for (const [k, v] of Object.entries(data.bindings || {})) next[String(k)] = String(v);
+      setBindings(next);
+      setMsg(data.msg || "智能绑定完成");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "智能绑定失败");
+    } finally {
+      setBusy("");
     }
-    setBindings(next);
-    setMsg("已按相同分类 ID 自动匹配，请检查后保存");
   }
 
   async function save() {
@@ -148,7 +162,7 @@ export default function CollectBindForm({
           <div className="flex flex-wrap items-center justify-between gap-2 bg-background-gray-primary px-4 py-3">
             <h2 className="font-semibold text-text-primary">资源站分类 → CMS 分类</h2>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={autoMatch} className="h-9 rounded-lg border border-card-border px-3 text-sm text-text-secondary hover:bg-card-surface-area">按同名自动匹配</button>
+              <button type="button" onClick={autoMatch} disabled={Boolean(busy)} className="h-9 rounded-lg border border-card-border px-3 text-sm text-text-secondary hover:bg-card-surface-area disabled:opacity-50">{busy === "auto" ? "智能匹配中…" : "一键智能绑定"}</button>
               <button type="button" onClick={save} disabled={Boolean(busy)} className="h-9 rounded-lg bg-primary-500 px-4 text-sm font-semibold text-white disabled:opacity-60">
                 {busy === "save" ? "保存中…" : "保存绑定"}
               </button>

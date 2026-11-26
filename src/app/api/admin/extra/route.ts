@@ -24,6 +24,13 @@ export async function POST(request: Request) {
         name: String(t.name || t.id).slice(0, 60),
         action: ["collect", "revalidate", "resetHits"].includes(t.action) ? t.action : "revalidate",
         intervalMinutes: Math.max(1, Number(t.intervalMinutes) || 60),
+        schedule: ["interval", "daily", "weekly"].includes(String(t.schedule || "")) ? t.schedule : "interval",
+        time: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(t.time || "")) ? String(t.time) : "00:00",
+        sourceId: Math.max(0, Number(t.sourceId) || 0),
+        sourceName: String(t.sourceName || "").slice(0, 60),
+        weekdays: Array.isArray(t.weekdays)
+          ? [...new Set(t.weekdays.map(Number).filter((v) => Number.isInteger(v) && v >= 0 && v <= 6))].sort((a, b) => a - b)
+          : [],
         enabled: t.enabled ? 1 : 0,
         params: String(t.params || "").slice(0, 2000),
         lastRun: Number(t.lastRun) || 0,

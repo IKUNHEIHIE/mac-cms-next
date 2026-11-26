@@ -18,6 +18,7 @@ export interface NavItemProps {
   href?: string;
   items?: Array<{ title: string; url?: string }>;
   collapsed?: boolean;
+  currentPath?: string;
   onItemClick?: () => void;
 }
 
@@ -28,13 +29,15 @@ export default function NavItem({
   href,
   items,
   collapsed,
+  currentPath,
   onItemClick,
 }: NavItemProps) {
   const pathname = usePathname();
+  const activePath = currentPath ?? pathname;
 
-  const isActive = href ? isPathActive(href, pathname) : false;
+  const isActive = href ? isPathActive(href, activePath) : false;
 
-  const hasActiveChild = items?.some((item) => item.url && isPathActive(item.url, pathname));
+  const hasActiveChild = items?.some((item) => item.url && isPathActive(item.url, activePath));
 
   // Collapsed: icon-only button centered, no dropdown
   if (collapsed) {
@@ -96,7 +99,7 @@ export default function NavItem({
 
         <CollapsibleContent className="space-y-1 pr-0 group-data-expanded:mt-2">
           {items.map((item) => {
-            const isChildActive = item.url ? isPathActive(item.url, pathname) : false;
+            const isChildActive = item.url ? isPathActive(item.url, activePath) : false;
 
             return (
               <div key={item.title} className="px-0">

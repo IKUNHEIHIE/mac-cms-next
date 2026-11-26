@@ -13,6 +13,7 @@ import RankList from "@/components/site/RankList";
 import CommentBox, { type CommentRow } from "@/components/site/CommentBox";
 import Icon from "@/components/site/Icon";
 import AdSlot from "@/components/site/AdSlot";
+import { VOD_RANK_SELECT, vodCardSelect } from "@/lib/vodQuery";
 
 export const dynamic = "force-dynamic";
 
@@ -53,8 +54,18 @@ export default async function PlayPage({
   const next = nid < source.urls.length ? source.urls[nid] : null;
 
   const [related, rankVods, types, comments, session, type, playerRows] = await Promise.all([
-    prisma.vod.findMany({ where: { typeId: vod.typeId, vodId: { not: vod.vodId } }, orderBy: { vodTime: "desc" }, take: 12 }),
-    prisma.vod.findMany({ orderBy: { vodHits: "desc" }, take: 10 }),
+    prisma.vod.findMany({
+      where: { typeId: vod.typeId, vodId: { not: vod.vodId }, vodStatus: 1 },
+      orderBy: { vodTime: "desc" },
+      take: 12,
+      select: vodCardSelect(theme.playlink),
+    }),
+    prisma.vod.findMany({
+      where: { vodStatus: 1 },
+      orderBy: { vodHits: "desc" },
+      take: 10,
+      select: VOD_RANK_SELECT,
+    }),
     prisma.type.findMany({ select: { typeId: true, typeName: true } }),
     prisma.comment.findMany({ where: { commentMid: 1, commentRid: vod.vodId, commentStatus: 1 }, orderBy: { commentTime: "desc" }, take: 30 }),
     getSessionUser(),

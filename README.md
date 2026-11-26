@@ -38,13 +38,25 @@ npx prisma db seed     # 导入分类 + 从 lzizy 采集影片（含电影/综�
 DATABASE_URL="mysql://root@127.0.0.1:3306/maccms"
 AUTH_SECRET="请替换为随机长字符串"
 CRON_SECRET="供外部 Cron 调用 /api/cron 使用的随机串"
+# 可选：启用 Redis 页面/设置缓存；未配置时自动退回数据库
+REDIS_URL="redis://127.0.0.1:6379"
+WARM_HOST="你的公网域名"
+HTML_CACHE_SECONDS="300"
 ```
 
 ### 3. 启动
 
 ```bash
 npm run dev      # http://localhost:3000
-npm run build && npm start
+npm run build && npm start   # 默认 3060 端口，启用 Redis 页面缓存与启动预热
+```
+
+生产环境使用 `server.mjs` 启动：它会缓存匿名 HTML 页面、在启动时预热首页/分类/榜单，并把站点设置和导航缓存到 Redis。后台、会员中心、API、RSS、媒体与播放器请求不会被页面缓存。`REDIS_URL` 未配置或 Redis 不可用时自动回退到普通 Next.js 服务。
+
+首次安装搜索索引（`prisma db push` 之后）：
+
+```bash
+npm run search:init
 ```
 
 ## 默认账号
@@ -54,7 +66,7 @@ npm run build && npm start
 | 后台 | `/admin` | admin | admin123 |
 | 前台会员 | `/user/login` | demo | demo123 |
 
-> 上线前必须修改默认密码与 `AUTH_SECRET`。
+> 上线前必须修改默认密码与 `AUTH_SECRET`；可在「系统设置 → 后台访问路径」修改后台入口，修改后 `/admin` 会跳转到新路径。
 
 ## 功能清单
 
@@ -66,7 +78,7 @@ npm run build && npm start
 - 专题、演员、角色、网址导航、漫画、排行榜、最新更新、留言板、RSS、免责声明
 - 会员中心：登录/注册/找回密码、资料修改、收藏、观看历史、下载、权限
 - 评论、观看历史自动记录
-- 苹果CMS v10 兼容数据接口：`/api/provide/vod`（`ac=list` / `ac=detail`，支持 `t/pg/wd/ids/limit`；`/api.php/provide/vod` 亦可）
+- 苹果CMS v10 兼容数据接口：`/api/provide/vod`（`ac=list` / `ac=detail`，支持 `t/pg/wd/ids/limit/h`；`/api.php/provide/vod` 亦可），带 `at=xml` 返回 RSS 5.1 XML，否则返回 JSON
 
 ### 后台（NextAdmin）
 - 控制台、数据统计（14 天趋势）
@@ -74,13 +86,15 @@ npm run build && npm start
 - 分类：分类（含筛选 JSON）、会员组
 - 会员：会员、会员组
 - 互动：评论、留言、站内消息、友情链接
-- 采集：资源采集（分类导入、按分类/页数采集、自动更新）、采集节点、文章采集（正则规则抓取，MD5 去重）
+- 采集：添加采集节点（JSON/XML 自动识别、一键智能分类绑定、分类导入、按分类/页数、当天 24 小时、本周 168 小时采集、自动更新）、采集节点、文章采集（正则规则抓取，MD5 去重）
 - 已移除：订单、充值卡、提现、积分日志、积分购买、在线充值、邀请奖励、VIP 升级及全部积分/支付能力（后台与会员端）。
 - 运营工具：广告位（首页/列表/搜索/详情右侧/播放页）、播放器线路名称、IP 黑名单、登录验证码、定时任务、百度 URL 推送、媒体库、域名记录
-- 系统：站点/主题设置、数据库概况 / JSON 导出 / JSON 导入、管理员、访问日志、播放日志、附件、模板对照、文件上传、缓存刷新、系统信息
+- 系统：站点/主题设置（含自定义后台访问路径，如 `/my-admin`）、数据库概况 / JSON 导出 / JSON 导入、管理员、访问日志、播放日志、附件、模板对照、文件上传、缓存刷新、系统信息
 - 全量 CRUD 由统一资源接口 `/api/admin/resource/[resource]` 提供，字段白名单、Int 类型转换与状态联动在 `src/lib/adminResources.ts` / `src/app/api/admin/resource/[resource]/route.ts`
 
 ### 定时任务与 URL 推送
+
+采集任务支持 `interval`、`daily`、`weekly` 三种计划；每天/每周采集会自动向资源站传 `h=24` / `h=168`（最近 24/168 小时），并采集对应范围内全部分页（最多 100 页）。定时任务可选择已添加的采集源，重复添加不同采集源即可分别执行；定时采集默认最多 2 个并行执行。非主采集源的影片 ID 会自动加命名空间，避免多个资源站的原 ID 冲突。全量采集也支持多节点并行，默认最多 2 个节点同时运行，可用 `COLLECT_MAX_PARALLEL` 调整。搜索索引重建使用 Redis 锁串行化，避免并行采集互相覆盖。服务器时区建议设为 `Asia/Shanghai`，Cron 建议每 5–10 分钟调用一次，以便补触发当天/当周任务。
 
 ```bash
 # 外部 Cron 调用（设置 CRON_SECRET 后可免登录）
@@ -88,7 +102,7 @@ curl -X POST -H "x-cron-secret: $CRON_SECRET" http://localhost:3000/api/cron
 curl -X POST -H "x-cron-secret: $CRON_SECRET" "http://localhost:3000/api/cron?force=1"
 ```
 
-任务在后台「运营工具 → 定时任务」中以 JSON 维护，支持 `collect`、`revalidate`、`resetHits`。
+任务在后台「运营工具 → 定时任务」维护，支持 `collect`、`revalidate`、`resetHits`。生产服务内置每分钟一次的定时检查（`INTERNAL_CRON=0` 可关闭），外部 Cron 也可调用 `POST /api/cron`。
 百度 URL 推送在「运营工具 → URL 推送」配置 Token 后手动推送最新 20 条。
 
 上传文件保存在 `public/uploads/`，通过 `/media/...` 路由读取（生产模式同样即时可访问）。

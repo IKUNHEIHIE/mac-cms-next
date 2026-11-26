@@ -2,6 +2,7 @@ import VodCard from "@/components/site/VodCard";
 import Pagination from "@/components/site/Pagination";
 import { prisma } from "@/lib/db";
 import { getSiteContext, pageParam } from "@/lib/site";
+import { vodCardSelect } from "@/lib/vodQuery";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "最新更新" };
@@ -13,7 +14,13 @@ export default async function MapPage({ searchParams }: { searchParams: Promise<
   const { settings } = await getSiteContext();
   const [total, list] = await Promise.all([
     prisma.vod.count({ where: { vodStatus: 1 } }),
-    prisma.vod.findMany({ where: { vodStatus: 1 }, orderBy: { vodTime: "desc" }, skip: (page - 1) * size, take: size }),
+    prisma.vod.findMany({
+      where: { vodStatus: 1 },
+      orderBy: { vodTime: "desc" },
+      skip: (page - 1) * size,
+      take: size,
+      select: vodCardSelect(settings.theme.playlink),
+    }),
   ]);
   const pageCount = Math.max(1, Math.ceil(total / size));
   return (

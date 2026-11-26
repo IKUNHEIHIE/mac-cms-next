@@ -12,6 +12,7 @@ import FavButton from "@/components/site/FavButton";
 import CommentBox, { type CommentRow } from "@/components/site/CommentBox";
 import Icon from "@/components/site/Icon";
 import AdSlot from "@/components/site/AdSlot";
+import { VOD_RANK_SELECT, vodCardSelect } from "@/lib/vodQuery";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +36,18 @@ export default async function VodDetailPage({ params }: { params: Promise<{ id: 
   const extra = await getExtra();
   const [type, related, rankVods, types, comments, session] = await Promise.all([
     prisma.type.findUnique({ where: { typeId: vod.typeId } }),
-    prisma.vod.findMany({ where: { typeId: vod.typeId, vodId: { not: vod.vodId }, vodStatus: 1 }, orderBy: { vodTime: "desc" }, take: 12 }),
-    prisma.vod.findMany({ orderBy: { vodHits: "desc" }, take: 10 }),
+    prisma.vod.findMany({
+      where: { typeId: vod.typeId, vodId: { not: vod.vodId }, vodStatus: 1 },
+      orderBy: { vodTime: "desc" },
+      take: 12,
+      select: vodCardSelect(theme.playlink),
+    }),
+    prisma.vod.findMany({
+      where: { vodStatus: 1 },
+      orderBy: { vodHits: "desc" },
+      take: 10,
+      select: VOD_RANK_SELECT,
+    }),
     prisma.type.findMany({ select: { typeId: true, typeName: true } }),
     prisma.comment.findMany({ where: { commentMid: 1, commentRid: vod.vodId, commentStatus: 1 }, orderBy: { commentTime: "desc" }, take: 30 }),
     getSessionUser(),
@@ -122,22 +133,20 @@ export default async function VodDetailPage({ params }: { params: Promise<{ id: 
                 </ul>
               </div>
               <div className="content_detail content_min content_btn fl">
-                <div className="playbtn">
+                <div className="playbtn o_play">
                   <Link className="btn btn_play" href={first}>
                     <Icon code={0xe626} />
                     &nbsp;立即播放
                   </Link>
-                  <Link href={`/vod/down/${vod.vodId}`} className="text_muted" style={{ marginLeft: "0.3rem", fontSize: "0.4rem" }}>
+                </div>
+                <div className="playbtn o_down">
+                  <Link className="btn" href={`/vod/down/${vod.vodId}`}>
                     下载
                   </Link>
-                  {vod.vodPlot ? (
-                    <Link href={`/plot/${vod.vodId}`} className="text_muted" style={{ marginLeft: "0.3rem", fontSize: "0.4rem" }}>
-                      分集剧情
-                    </Link>
-                  ) : null}
-                  <span className="text_muted" style={{ marginLeft: "0.3rem", fontSize: "0.3rem" }}>
-                    共 {playCount} 集
-                  </span>
+                </div>
+                <div className="playbtn_info">
+                  {vod.vodPlot ? <Link href={`/plot/${vod.vodId}`}>分集剧情</Link> : null}
+                  <span>共 {playCount} 集</span>
                 </div>
               </div>
             </div>

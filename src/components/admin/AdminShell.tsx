@@ -6,7 +6,7 @@ import { SheetContent, SheetOverlay, SheetTitle } from "@/components/tailgrids/c
 import { cn } from "@/utils/cn";
 import { useState } from "react";
 
-export default function AdminShell({ children }: { children: React.ReactNode }) {
+export default function AdminShell({ children, adminPath = "/admin" }: { children: React.ReactNode; adminPath?: string }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
@@ -21,7 +21,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         }}
         className="hidden shrink-0 overflow-hidden xl:block"
       >
-        <Sidebar isSidebarOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
+        <Sidebar isSidebarOpen={isSidebarOpen} toggleSidebar={toggleSidebar} adminPath={adminPath} />
       </aside>
 
       <SheetOverlay isOpen={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
@@ -36,6 +36,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             toggleSidebar={() => setIsMobileSheetOpen(false)}
             onItemClick={() => setIsMobileSheetOpen(false)}
             isMobileSheet
+            adminPath={adminPath}
           />
         </SheetContent>
       </SheetOverlay>

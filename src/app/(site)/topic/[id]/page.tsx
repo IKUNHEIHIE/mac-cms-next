@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import VodCard from "@/components/site/VodCard";
 import { getSiteContext } from "@/lib/site";
 import { poster } from "@/lib/maccms";
+import { vodCardSelect } from "@/lib/vodQuery";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,12 @@ export default async function TopicDetailPage({ params }: { params: Promise<{ id
     .split(",")
     .map((s) => Number(s.trim()))
     .filter((n) => Number.isFinite(n) && n > 0);
-  const vods = ids.length ? await prisma.vod.findMany({ where: { vodId: { in: ids } } }) : [];
+  const vods = ids.length
+    ? await prisma.vod.findMany({
+        where: { vodId: { in: ids }, vodStatus: 1 },
+        select: vodCardSelect(settings.theme.playlink),
+      })
+    : [];
   const ordered = ids.map((vid) => vods.find((v) => v.vodId === vid)).filter(Boolean) as typeof vods;
 
   return (

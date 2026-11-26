@@ -13,6 +13,7 @@ type FieldDef = { key: string; label: string; type?: "text" | "number" | "textar
 const SITE_FIELDS: FieldDef[] = [
   { key: "site_name", label: "网站名称" },
   { key: "site_url", label: "网站地址" },
+  { key: "adminPath", label: "后台访问路径" },
   { key: "site_keywords", label: "SEO 关键词" },
   { key: "site_description", label: "SEO 描述", type: "textarea" },
   { key: "site_email", label: "联系邮箱" },
@@ -107,6 +108,12 @@ export default function SettingsForm({ settings }: { settings: Settings }) {
       const data = await res.json();
       if (!res.ok || data.code === 0) throw new Error(data.msg || "保存失败");
       setOk(true);
+      const nextPath = typeof data.site?.adminPath === "string" ? data.site.adminPath : null;
+      if (nextPath && nextPath !== String(settings.site.adminPath || "/admin")) {
+        setMsg(`已保存，后台新地址：${nextPath}，即将跳转`);
+        setTimeout(() => window.location.assign(nextPath), 900);
+        return;
+      }
       setMsg("已保存，前台刷新后生效");
       router.refresh();
     } catch (err) {
@@ -129,6 +136,9 @@ export default function SettingsForm({ settings }: { settings: Settings }) {
             </div>
           ))}
         </div>
+        <p className="mt-3 text-xs leading-6 text-text-tertiary">
+          后台访问路径使用 2–32 位字母、数字、下划线或短横线，例如 /my-admin；默认 /admin。修改后旧地址会自动跳转到新地址。
+        </p>
         <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
           {SWITCHES.map((f) => (
             <label key={f.key} className="flex items-center gap-2 rounded-lg border border-card-border px-3 py-2 text-sm text-text-secondary">

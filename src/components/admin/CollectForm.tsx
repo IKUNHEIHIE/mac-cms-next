@@ -9,13 +9,14 @@ export default function CollectForm({ defaultApi }: { defaultApi: string }) {
   const [pages, setPages] = useState(3);
   const [startPage, setStartPage] = useState(1);
   const [typeId, setTypeId] = useState("");
+  const [format, setFormat] = useState<"auto" | "json" | "xml">("auto");
   const [markLevel, setMarkLevel] = useState(true);
-  const [busy, setBusy] = useState<"" | "types" | "collect">("");
+  const [busy, setBusy] = useState<"" | "types" | "collect" | "day" | "week">("");
   const [result, setResult] = useState("");
   const [ok, setOk] = useState(false);
 
-  async function run(action: "types" | "collect") {
-    setBusy(action);
+  async function run(action: "types" | "collect", hours?: number) {
+    setBusy(hours === 24 ? "day" : hours === 168 ? "week" : action);
     setResult("");
     try {
       const res = await fetch("/api/admin/collect", {
@@ -24,8 +25,10 @@ export default function CollectForm({ defaultApi }: { defaultApi: string }) {
         body: JSON.stringify({
           action,
           api,
-          pages,
-          startPage,
+          pages: hours ? 100 : pages,
+          startPage: hours ? 1 : startPage,
+          hours,
+          format,
           typeId: typeId ? Number(typeId) : undefined,
           markLevel,
         }),
@@ -79,6 +82,19 @@ export default function CollectForm({ defaultApi }: { defaultApi: string }) {
           />
         </div>
         <div>
+          <label className="mb-1.5 block text-sm text-text-secondary">接口格式</label>
+          <select
+            value={format}
+            onChange={(e) => setFormat(e.target.value as "auto" | "json" | "xml")}
+            className="h-10 w-full rounded-lg border border-card-border bg-background-gray-primary px-3 text-sm"
+          >
+            <option value="auto">自动识别 JSON/XML</option>
+            <option value="json">JSON</option>
+            <option value="xml">XML</option>
+          </select>
+          <p className="mt-1 text-xs text-text-tertiary">XML 模式会自动附加 at=xml 参数</p>
+        </div>
+        <div>
           <label className="mb-1.5 block text-sm text-text-secondary">只采集指定分类 ID（选填）</label>
           <input
             value={typeId}
@@ -108,6 +124,22 @@ export default function CollectForm({ defaultApi }: { defaultApi: string }) {
           className="h-10 rounded-lg bg-primary-500 px-6 text-sm font-semibold text-white disabled:opacity-50"
         >
           {busy === "collect" ? "采集中，请稍候…" : "② 开始采集"}
+        </button>
+        <button
+          type="button"
+          onClick={() => run("collect", 24)}
+          disabled={Boolean(busy)}
+          className="h-10 rounded-lg border border-card-border px-5 text-sm text-text-secondary hover:bg-background-gray-primary disabled:opacity-50"
+        >
+          {busy === "day" ? "采集中…" : "采集当天（24小时）"}
+        </button>
+        <button
+          type="button"
+          onClick={() => run("collect", 168)}
+          disabled={Boolean(busy)}
+          className="h-10 rounded-lg border border-card-border px-5 text-sm text-text-secondary hover:bg-background-gray-primary disabled:opacity-50"
+        >
+          {busy === "week" ? "采集中…" : "采集本周（168小时）"}
         </button>
         {result ? <span className={`text-sm ${ok ? "text-green-600" : "text-red-500"}`}>{result}</span> : null}
       </div>

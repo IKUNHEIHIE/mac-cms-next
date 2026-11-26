@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { assertAdmin } from "@/lib/adminAuth";
+import { rebuildVodSearchIndex } from "@/lib/searchIndex";
+import { bumpPublicCacheVersion } from "@/lib/redis";
 
 export const maxDuration = 300;
 
@@ -74,6 +76,8 @@ export async function POST(request: Request) {
   if (ops.length === 0) return NextResponse.json({ code: 0, msg: "备份中没有可导入的数据" }, { status: 400 });
   try {
     await prisma.$transaction(ops as never[]);
+    if (counts.vod) await rebuildVodSearchIndex().catch(() => {});
+    await bumpPublicCacheVersion();
     return NextResponse.json({ code: 1, msg: "导入完成", counts });
   } catch (e) {
     return NextResponse.json({ code: 0, msg: e instanceof Error ? e.message : "导入失败" }, { status: 400 });

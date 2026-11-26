@@ -3,6 +3,7 @@ import VodCard from "@/components/site/VodCard";
 import { prisma } from "@/lib/db";
 import { getSiteContext } from "@/lib/site";
 import type { Prisma } from "@prisma/client";
+import { vodCardSelect } from "@/lib/vodQuery";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "排行榜" };
@@ -20,7 +21,12 @@ export default async function RankPage({ searchParams }: { searchParams: Promise
   const tab = TABS.find((t) => t.key === by)!;
   const orderBy = { [tab.field]: "desc" } as Prisma.VodOrderByWithRelationInput;
   const { settings } = await getSiteContext();
-  const list = await prisma.vod.findMany({ orderBy, take: 60 });
+  const list = await prisma.vod.findMany({
+    where: { vodStatus: 1 },
+    orderBy,
+    take: 60,
+    select: vodCardSelect(settings.theme.playlink),
+  });
 
   return (
     <div className="container">

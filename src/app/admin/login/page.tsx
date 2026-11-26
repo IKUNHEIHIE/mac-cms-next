@@ -1,9 +1,11 @@
 import AdminLoginForm from "@/components/admin/AdminLoginForm";
 import Link from "next/link";
+import { getSettings } from "@/lib/settings";
 
 export const metadata = { title: "后台登录" };
 
-export default function AdminLoginPage() {
+export default async function AdminLoginPage() {
+  const { site } = await getSettings();
   return (
     <div className="flex h-screen items-center justify-center bg-gradient-to-br from-[#0f1020] via-[#1b1c33] to-[#2a1a3d] p-4">
       <div className="w-full max-w-[420px] rounded-2xl bg-card-surface-area p-8 shadow-2xl">
@@ -14,7 +16,7 @@ export default function AdminLoginPage() {
           <h1 className="text-xl font-bold text-text-primary">MAC CMS 管理后台</h1>
           <p className="mt-1 text-sm text-text-tertiary">TypeScript + Next.js 重构版</p>
         </div>
-        <AdminLoginForm />
+        <AdminLoginForm adminPath={site.adminPath} />
         <div className="mt-6 text-center text-xs">
           <Link href="/" className="text-text-tertiary hover:text-primary-500">
             ← 返回网站首页

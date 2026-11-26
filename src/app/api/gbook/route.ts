@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { currentUser, ipToInt } from "@/lib/user";
 import { ipFromRequest } from "@/lib/extraSettings";
 import { isRateLimited, recordFailure } from "@/lib/rateLimit";
+import { bumpPublicCacheVersion } from "@/lib/redis";
 
 export async function POST(request: Request) {
   if (await isBlockedRequest(request)) return NextResponse.json({ code: 0, msg: "访问受限" }, { status: 403 });
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
       gbookContent: content.slice(0, 255),
     },
   });
+  await bumpPublicCacheVersion();
   return NextResponse.json({ code: 1, msg: "留言成功", gbook: row });
 }
 

@@ -2,6 +2,9 @@ import { createHash } from "node:crypto";
 import { prisma } from "./db";
 import { safeFetch } from "./net";
 import { typeSeoFor } from "./typeSeo";
+import { syncVodSearchIds } from "./searchIndex";
+import { CACHE_KEYS, bumpPublicCacheVersion, cacheDel } from "./redis";
+import { parseXmlResponse, type LzClass, type LzResponse, type LzVod } from "./xmlCollect";
 
 export const LZ_API = "https://lzizy.net/api.php/provide/vod/";
 
@@ -13,6 +16,15 @@ function normalizeApi(api: string) {
 
 export function apiFlag(api: string) {
   return createHash("md5").update(normalizeApi(api)).digest("hex");
+}
+
+const PRIMARY_API = normalizeApi(LZ_API);
+
+export function sourceIdOffset(api = LZ_API) {
+  const normalized = normalizeApi(api);
+  if (normalized === PRIMARY_API) return 0;
+  const digest = createHash("sha1").update(normalized).digest();
+  return 1_000_000_000 + (digest.readUInt32BE(0) % 100) * 10_000_000;
 }
 
 export async function getCollectBindings(api = LZ_API): Promise<CollectBindings> {
@@ -54,23 +66,12 @@ export async function saveCollectBindings(api: string, bindings: CollectBindings
   return bindings;
 }
 
-export async function fetchRemoteTypes(api = LZ_API) {
-  const data = await lzFetch(`${api}?ac=list`);
+export type CollectFormat = "auto" | "json" | "xml";
+
+export async function fetchRemoteTypes(api = LZ_API, format: CollectFormat = "auto") {
+  const data = await lzFetch(`${api}?ac=list`, format);
   return data.class || [];
 }
-
-type LzClass = { type_id: number; type_pid: number; type_name: string };
-type LzVod = Record<string, string | number | undefined>;
-
-type LzResponse = {
-  code?: number;
-  msg?: string;
-  page?: number;
-  pagecount?: number;
-  total?: number;
-  list?: LzVod[];
-  class?: LzClass[];
-};
 
 const SYSTEM_PARENT: Record<number, number> = { 35: 1, 46: 2, 52: 4 };
 
@@ -79,22 +80,56 @@ const PLAYER_NOTE: Record<string, string> = {
   lzm3u8: "LZ线路",
 };
 
-async function lzFetch(url: string): Promise<LzResponse> {
+function withFormat(url: string, format: CollectFormat) {
+  if (format === "auto") return url;
+  const parsed = new URL(url);
+  if (format === "xml") parsed.searchParams.set("at", "xml");
+  else parsed.searchParams.delete("at");
+  return parsed.toString();
+}
+
+async function fetchText(url: string) {
   const res = await safeFetch(url, {
     headers: {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
-      Accept: "application/json,text/plain,*/*",
+      Accept: "application/json,text/xml,application/xml,text/plain,*/*",
     },
     cache: "no-store",
     signal: AbortSignal.timeout(30000),
   });
   if (!res.ok) throw new Error(`资源站返回 ${res.status}`);
-  const text = await res.text();
+  return res.text();
+}
+
+async function lzFetch(url: string, format: CollectFormat = "auto"): Promise<LzResponse> {
+  const target = withFormat(url, format);
+  const text = await fetchText(target);
+  const isXml = format === "xml" || (format === "auto" && text.trimStart().startsWith("<"));
+  if (isXml) {
+    try {
+      return parseXmlResponse(text);
+    } catch (e) {
+      throw new Error(`资源站 XML 解析失败：${e instanceof Error ? e.message : "格式错误"}`);
+    }
+  }
   try {
-    return JSON.parse(text) as LzResponse;
+    const json = JSON.parse(text) as LzResponse;
+    if (format === "auto" && !Array.isArray(json.list) && !Array.isArray(json.class)) {
+      const xmlUrl = withFormat(url, "xml");
+      if (xmlUrl !== target) {
+        try {
+          return parseXmlResponse(await fetchText(xmlUrl));
+        } catch {}
+      }
+    }
+    return json;
   } catch {
-    throw new Error("资源站返回的不是有效 JSON");
+    if (format === "auto") {
+      const xmlUrl = withFormat(url, "xml");
+      if (xmlUrl !== target) return parseXmlResponse(await fetchText(xmlUrl));
+    }
+    throw new Error("资源站返回的不是有效 JSON/XML");
   }
 }
 
@@ -117,12 +152,13 @@ function ts(v: unknown) {
 export function mapLzVod(
   v: LzVod,
   typeParent: Record<number, number>,
-  opts: { level?: number; bindings?: CollectBindings } = {},
+  opts: { level?: number; bindings?: CollectBindings; idOffset?: number } = {},
 ) {
   const remoteTypeId = num(v.type_id);
   const bound = opts.bindings?.[remoteTypeId];
   const typeId = bound && bound > 0 ? bound : remoteTypeId;
-  const vid = num(v.vod_id);
+  const remoteVid = num(v.vod_id);
+  const vid = remoteVid + (opts.idOffset || 0);
   const hits = Math.abs((vid * 7919) % 90000) + 1200;
   const score = Number(v.vod_score) > 0 ? Number(v.vod_score) : Number(((vid % 30) / 10 + 6.5).toFixed(1));
   const from = str(v.vod_play_from);
@@ -134,7 +170,7 @@ export function mapLzVod(
   return {
     vodId: vid,
     typeId,
-    typeId1: typeParent[typeId] || 0,
+    typeId1: typeParent[typeId] || typeId,
     groupId: 0,
     vodName: str(v.vod_name),
     vodSub: str(v.vod_sub),
@@ -217,8 +253,8 @@ export function mapLzVod(
   };
 }
 
-export async function importTypes(api = LZ_API) {
-  const classes = await fetchRemoteTypes(api);
+export async function importTypes(api = LZ_API, format: CollectFormat = "auto") {
+  const classes = await fetchRemoteTypes(api, format);
   const parents: Record<number, number> = {};
   for (const c of classes) parents[c.type_id] = SYSTEM_PARENT[c.type_id] ?? c.type_pid ?? 0;
   const extend = JSON.stringify({
@@ -288,6 +324,7 @@ export async function importTypes(api = LZ_API) {
       typeExtend: extend,
     },
   });
+  await Promise.all([cacheDel(CACHE_KEYS.navTypes), bumpPublicCacheVersion()]);
   return { count: classes.length + 1, parents };
 }
 
@@ -296,27 +333,33 @@ export async function collectVods(options: {
   pages?: number;
   startPage?: number;
   typeId?: number;
+  hours?: number;
+  format?: CollectFormat;
   limit?: number;
   markLevel?: boolean;
 }) {
   const api = options.api || LZ_API;
-  const pages = Math.max(1, Math.min(options.pages ?? 2, 30));
+  const pages = Math.max(1, Math.min(options.pages ?? 2, options.hours ? 100 : 30));
   const startPage = Math.max(1, options.startPage ?? 1);
   const limit = options.limit ?? pages * 20;
   const typeRows = await prisma.type.findMany({ select: { typeId: true, typePid: true } });
   const parent: Record<number, number> = {};
   for (const t of typeRows) parent[t.typeId] = t.typePid;
   const bindings = await getCollectBindings(api);
+  const idOffset = sourceIdOffset(api);
 
   let imported = 0;
   let updated = 0;
   let seen = 0;
   let pagecount = 0;
+  const touched: number[] = [];
 
   outer: for (let page = startPage; page < startPage + pages; page++) {
+    if (options.hours && page > startPage) await new Promise((resolve) => setTimeout(resolve, 700));
     const qs = new URLSearchParams({ ac: "detail", pg: String(page) });
     if (options.typeId) qs.set("t", String(options.typeId));
-    const data = await lzFetch(`${api}?${qs.toString()}`);
+    if (options.hours && options.hours > 0) qs.set("h", String(Math.min(720, Math.floor(options.hours))));
+    const data = await lzFetch(`${api}?${qs.toString()}`, options.format || "auto");
     pagecount = data.pagecount || pagecount;
     const list = data.list || [];
     if (!list.length) break;
@@ -326,6 +369,7 @@ export async function collectVods(options: {
       const mapped = mapLzVod(list[i], parent, {
         level: options.markLevel && seen <= 12 ? 9 : undefined,
         bindings,
+        idOffset,
       });
       if (!mapped.vodId || !mapped.vodName) continue;
       const exists = await prisma.vod.findUnique({ where: { vodId: mapped.vodId }, select: { vodId: true } });
@@ -336,7 +380,12 @@ export async function collectVods(options: {
       });
       if (exists) updated++;
       else imported++;
+      touched.push(mapped.vodId);
     }
+  }
+  if (touched.length) {
+    await syncVodSearchIds(touched).catch(() => {});
+    await bumpPublicCacheVersion();
   }
   return { imported, updated, pagecount, total: seen };
 }

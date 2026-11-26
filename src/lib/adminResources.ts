@@ -471,7 +471,11 @@ export const RESOURCES: Record<string, ResourceDef> = {
       { key: "collectName", label: "名称" },
       { key: "collectUrl", label: "接口地址", help: "苹果CMS v10 JSON 接口根地址" },
       { key: "collectMid", label: "模块", type: "number" },
-      { key: "collectType", label: "类型", type: "number" },
+      { key: "collectType", label: "接口格式", type: "select", options: [
+        { value: "1", label: "XML" },
+        { value: "2", label: "JSON" },
+        { value: "0", label: "自动识别" },
+      ] },
       { key: "collectAppid", label: "AppID" },
       { key: "collectAppkey", label: "AppKey" },
       { key: "collectParam", label: "附加参数" },

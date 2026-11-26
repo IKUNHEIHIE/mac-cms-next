@@ -1,13 +1,19 @@
 import VodCard from "@/components/site/VodCard";
 import { prisma } from "@/lib/db";
 import { getSiteContext } from "@/lib/site";
+import { vodCardSelect } from "@/lib/vodQuery";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "最新更新" };
 
 export default async function LabelUpdatePage() {
   const { settings } = await getSiteContext();
-  const list = await prisma.vod.findMany({ where: { vodStatus: 1 }, orderBy: { vodTime: "desc" }, take: 60 });
+  const list = await prisma.vod.findMany({
+    where: { vodStatus: 1 },
+    orderBy: { vodTime: "desc" },
+    take: 60,
+    select: vodCardSelect(settings.theme.playlink),
+  });
   return (
     <div className="container">
       <div className="pannel clearfix">
